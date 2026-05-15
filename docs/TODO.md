@@ -27,7 +27,7 @@
 - [x] AGENTS.md 작성
 - [x] README.md 작성
 - [x] TODO.md 작성
-- [ ] Vite + TypeScript 프로젝트 scaffold 생성
+- [x] Vite + TypeScript 프로젝트 scaffold 생성
 - [ ] 게임 루프 구현
 - [ ] MVP 전체 플레이 가능
 
@@ -35,8 +35,8 @@
 
 완료 조건: 브라우저에서 Canvas가 렌더링되고, 입력과 업데이트 루프가 동작한다.
 
-- [ ] Vite + TypeScript 프로젝트 생성
-- [ ] 기본 `src/` 구조 생성
+- [x] Vite + TypeScript 프로젝트 생성
+- [x] 기본 `src/` 구조 생성
 - [ ] Canvas 초기화
 - [ ] 고정 timestep 또는 delta time 기반 게임 루프 구현
 - [ ] 입력 관리자 구현
@@ -45,6 +45,7 @@
 
 검증:
 
+- [x] `npm run build` 통과
 - [ ] `npm run dev`로 브라우저 실행 가능
 - [ ] Canvas가 비어 있지 않게 렌더링됨
 - [ ] WASD 또는 방향키 입력 상태 확인 가능
@@ -249,6 +250,6 @@
 
 ## 다음 작업
 
-1. Vite + TypeScript 프로젝트 scaffold를 생성한다.
+1. Canvas 초기화를 구현한다.
 2. Canvas 게임 루프와 입력 처리를 구현한다.
 3. 오두막 내부와 외부 필드의 최소 씬 전환을 만든다.
