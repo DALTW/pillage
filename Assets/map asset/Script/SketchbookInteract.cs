@@ -4,10 +4,12 @@ using UnityEngine;
 public class SketchbookInteract : MonoBehaviour, IInteractable
 {
     [SerializeField] private GameObject bigSketchbookUI;
+    [SerializeField] private SketchbookDrawingAnimation sketchbookDrawingAnimation;
     [SerializeField] private float openScaleDuration = 0.2f;
 
     private bool isOpen;
     private Coroutine scaleRoutine;
+    private Vector3 openScale = Vector3.one;
 
     private void Start()
     {
@@ -15,6 +17,16 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         {
             Debug.LogWarning("Big Sketchbook UI is not assigned.", this);
             return;
+        }
+
+        openScale = bigSketchbookUI.transform.localScale;
+        sketchbookDrawingAnimation = sketchbookDrawingAnimation != null
+            ? sketchbookDrawingAnimation
+            : bigSketchbookUI.GetComponent<SketchbookDrawingAnimation>();
+
+        if (sketchbookDrawingAnimation == null)
+        {
+            sketchbookDrawingAnimation = bigSketchbookUI.AddComponent<SketchbookDrawingAnimation>();
         }
 
         bigSketchbookUI.SetActive(false);
@@ -49,6 +61,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
             return;
         }
 
+        bool shouldPlayDrawingAnimation = !GameProgress.HasPlayedSketchbookDrawing;
         GameProgress.CheckSketchbook();
         isOpen = true;
         bigSketchbookUI.SetActive(true);
@@ -58,7 +71,19 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
             StopCoroutine(scaleRoutine);
         }
 
-        scaleRoutine = StartCoroutine(ScaleUI(Vector3.zero, Vector3.one));
+        if (sketchbookDrawingAnimation != null)
+        {
+            if (shouldPlayDrawingAnimation)
+            {
+                sketchbookDrawingAnimation.ResetDrawing();
+            }
+            else
+            {
+                sketchbookDrawingAnimation.ShowCompletedDrawing();
+            }
+        }
+
+        scaleRoutine = StartCoroutine(OpenScaleUI(bigSketchbookUI.transform.localScale, shouldPlayDrawingAnimation));
     }
 
     private void CloseSketchbook()
@@ -75,7 +100,23 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
             StopCoroutine(scaleRoutine);
         }
 
+        if (sketchbookDrawingAnimation != null)
+        {
+            sketchbookDrawingAnimation.ResetDrawing();
+        }
+
         scaleRoutine = StartCoroutine(CloseScaleUI());
+    }
+
+    private IEnumerator OpenScaleUI(Vector3 startScale, bool shouldPlayDrawingAnimation)
+    {
+        yield return ScaleUI(startScale, openScale);
+
+        if (isOpen && shouldPlayDrawingAnimation && sketchbookDrawingAnimation != null)
+        {
+            GameProgress.PlaySketchbookDrawing();
+            sketchbookDrawingAnimation.Play();
+        }
     }
 
     private IEnumerator CloseScaleUI()
