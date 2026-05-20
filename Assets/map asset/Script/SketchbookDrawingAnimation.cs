@@ -1,25 +1,42 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class SketchbookDrawingAnimation : MonoBehaviour
 {
+    private const float RequestedDrawDuration = 18f;
+    private const float RequestedPencilWidth = 75f;
+    private const float RequestedPencilHeight = 15f;
+    private const float RequestedPencilStartLengthScale = 1f;
+    private const float RequestedPencilEndLengthScale = 0.35f;
+
     [SerializeField] private RectTransform drawingRoot;
     [SerializeField] private bool playOnEnable;
     [SerializeField] private float startDelay = 0.12f;
-    [SerializeField] private float drawDuration = 2.1f;
+    [SerializeField] private float drawDuration = RequestedDrawDuration;
     [SerializeField] private float pencilExitDuration = 0.28f;
     [SerializeField] private Vector2 drawingSize = new Vector2(820f, 540f);
     [SerializeField] private Vector2 drawingOffset = new Vector2(0f, -20f);
     [SerializeField] private float lineWidth = 5f;
     [SerializeField] private Color lineColor = new Color32(34, 32, 29, 255);
-    [SerializeField] private Vector2 pencilSize = new Vector2(150f, 30f);
+    [SerializeField] private Vector2 pencilSize = new Vector2(RequestedPencilWidth, RequestedPencilHeight);
+    [SerializeField] private float pencilStartLengthScale = RequestedPencilStartLengthScale;
+    [SerializeField] private float pencilEndLengthScale = RequestedPencilEndLengthScale;
 
     private SketchbookLineDrawingGraphic drawingGraphic;
     private RectTransform pencilRoot;
     private CanvasGroup pencilCanvasGroup;
     private Coroutine animationRoutine;
+    private Action animationCompleteCallback;
     private bool isSetup;
+
+    public bool IsPlaying => animationRoutine != null;
+
+    private void Awake()
+    {
+        ApplyRequestedAnimationSettings();
+    }
 
     private void OnEnable()
     {
@@ -34,10 +51,12 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         StopAnimation();
     }
 
-    public void Play()
+    public void Play(Action onComplete = null)
     {
+        ApplyRequestedAnimationSettings();
         EnsureSetup();
         StopAnimation();
+        animationCompleteCallback = onComplete;
         animationRoutine = StartCoroutine(PlayRoutine());
     }
 
@@ -76,15 +95,16 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         SetPencilAtProgress(0f);
 
         float elapsed = 0f;
+        float revealProgress = 0f;
 
         while (elapsed < drawDuration)
         {
             elapsed += Time.deltaTime;
             float progress = Mathf.Clamp01(elapsed / drawDuration);
-            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            revealProgress = Mathf.Max(revealProgress, ApplyChildDrawingPace(progress));
 
-            drawingGraphic.RevealProgress = easedProgress;
-            SetPencilAtProgress(easedProgress);
+            drawingGraphic.RevealProgress = revealProgress;
+            SetPencilAtProgress(revealProgress, elapsed, true);
             yield return null;
         }
 
@@ -98,6 +118,9 @@ public class SketchbookDrawingAnimation : MonoBehaviour
 
         pencilRoot.gameObject.SetActive(false);
         animationRoutine = null;
+        Action onComplete = animationCompleteCallback;
+        animationCompleteCallback = null;
+        onComplete?.Invoke();
     }
 
     private IEnumerator MovePencilOut()
@@ -120,6 +143,8 @@ public class SketchbookDrawingAnimation : MonoBehaviour
 
     private void EnsureSetup()
     {
+        ApplyRequestedAnimationSettings();
+
         if (isSetup && drawingGraphic != null && pencilRoot != null)
         {
             return;
@@ -188,8 +213,8 @@ public class SketchbookDrawingAnimation : MonoBehaviour
 
         root.anchorMin = new Vector2(0.5f, 0.5f);
         root.anchorMax = new Vector2(0.5f, 0.5f);
-        root.pivot = new Vector2(0.96f, 0.5f);
-        root.sizeDelta = pencilSize;
+        root.pivot = new Vector2(1f, 0.5f);
+        root.sizeDelta = new Vector2(pencilSize.x * pencilStartLengthScale, pencilSize.y);
         root.localScale = Vector3.one;
 
         SketchbookPencilGraphic pencilGraphic = root.GetComponent<SketchbookPencilGraphic>();
@@ -208,17 +233,83 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         pencilCanvasGroup.alpha = 1f;
         pencilRoot.gameObject.SetActive(false);
         pencilRoot.localRotation = Quaternion.identity;
+        pencilRoot.localScale = Vector3.one;
+        SetPencilLengthAtProgress(0f);
         pencilRoot.anchoredPosition = drawingGraphic.GetPointAtProgress(0f);
     }
 
     private void SetPencilAtProgress(float progress)
     {
+        SetPencilAtProgress(progress, 0f, false);
+    }
+
+    private void SetPencilAtProgress(float progress, float motionSeconds, bool applyChildMotion)
+    {
         Vector2 point = drawingGraphic.GetPointAtProgress(progress);
         Vector2 tangent = drawingGraphic.GetTangentAtProgress(progress);
+        float childAngleOffset = 0f;
+
+        if (applyChildMotion)
+        {
+            Vector2 normal = new Vector2(-tangent.y, tangent.x);
+            float wobble = Mathf.Sin(motionSeconds * 17.5f) * 1.35f
+                + Mathf.Sin(motionSeconds * 31.7f + 0.8f) * 0.75f;
+            float drag = Mathf.Sin(motionSeconds * 11.2f + 1.4f) * 0.8f;
+
+            point += normal * wobble + tangent * drag;
+            childAngleOffset = Mathf.Sin(motionSeconds * 10.4f) * 4.2f
+                + Mathf.Sin(motionSeconds * 23.5f + 0.4f) * 1.4f;
+        }
+
         float angle = Mathf.Atan2(tangent.y, tangent.x) * Mathf.Rad2Deg;
 
         pencilRoot.anchoredPosition = point;
-        pencilRoot.localRotation = Quaternion.Euler(0f, 0f, angle);
+        pencilRoot.localRotation = Quaternion.Euler(0f, 0f, angle + childAngleOffset);
+        SetPencilLengthAtProgress(progress);
+    }
+
+    private float ApplyChildDrawingPace(float progress)
+    {
+        float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+        float unevenPace = Mathf.Sin(progress * Mathf.PI * 13f) * 0.02f
+            + Mathf.Sin(progress * Mathf.PI * 31f + 1.2f) * 0.007f;
+        float middleWeight = 1f - Mathf.Abs(progress * 2f - 1f);
+        float hesitation = ChildPause(progress, 0.12f, 0.025f)
+            + ChildPause(progress, 0.31f, 0.02f)
+            + ChildPause(progress, 0.57f, 0.026f)
+            + ChildPause(progress, 0.78f, 0.018f);
+
+        return Mathf.Clamp01(easedProgress + unevenPace * middleWeight - hesitation);
+    }
+
+    private static float ChildPause(float progress, float center, float radius)
+    {
+        float distance = Mathf.Abs(progress - center) / radius;
+
+        if (distance >= 1f)
+        {
+            return 0f;
+        }
+
+        return Mathf.SmoothStep(0f, 1f, 1f - distance) * 0.018f;
+    }
+
+    private void SetPencilLengthAtProgress(float progress)
+    {
+        float lengthScale = Mathf.Lerp(
+            pencilStartLengthScale,
+            pencilEndLengthScale,
+            Mathf.Clamp01(progress));
+
+        pencilRoot.sizeDelta = new Vector2(pencilSize.x * lengthScale, pencilSize.y);
+    }
+
+    private void ApplyRequestedAnimationSettings()
+    {
+        drawDuration = RequestedDrawDuration;
+        pencilSize = new Vector2(RequestedPencilWidth, RequestedPencilHeight);
+        pencilStartLengthScale = RequestedPencilStartLengthScale;
+        pencilEndLengthScale = RequestedPencilEndLengthScale;
     }
 
     private void StopAnimation()
@@ -230,6 +321,7 @@ public class SketchbookDrawingAnimation : MonoBehaviour
 
         StopCoroutine(animationRoutine);
         animationRoutine = null;
+        animationCompleteCallback = null;
     }
 
     private static List<Vector2[]> BuildSketchbookStrokes()
@@ -260,27 +352,45 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         strokes.Add(Points(118f, -176f, 118f, -54f));
         strokes.Add(Points(212f, -176f, 212f, -54f));
         strokes.Add(Points(120f, -54f, 144f, -28f, 166f, -22f, 190f, -28f, 212f, -54f));
-        strokes.Add(Points(54f, -174f, 58f, 48f));
-        strokes.Add(Points(76f, -172f, 74f, 52f));
-        strokes.Add(Points(36f, 18f, 66f, 104f, 98f, 18f, 36f, 18f));
-        strokes.Add(Points(42f, 58f, 66f, 138f, 92f, 58f));
-        strokes.Add(Points(238f, -174f, 238f, 58f));
-        strokes.Add(Points(262f, -174f, 262f, 58f));
-        strokes.Add(Points(218f, 24f, 250f, 118f, 286f, 24f, 218f, 24f));
-        strokes.Add(Points(226f, 66f, 250f, 152f, 278f, 66f));
-        strokes.Add(Points(300f, -176f, 302f, 28f));
-        strokes.Add(Points(323f, -176f, 322f, 28f));
-        strokes.Add(Points(276f, -10f, 312f, 90f, 350f, -10f, 276f, -10f));
-        strokes.Add(Points(286f, 40f, 312f, 122f, 342f, 40f));
-        strokes.Add(Points(-42f, -176f, -42f, 30f));
-        strokes.Add(Points(-18f, -176f, -20f, 30f));
-        strokes.Add(Points(-68f, -12f, -30f, 96f, 8f, -12f, -68f, -12f));
-        strokes.Add(Points(-58f, 42f, -30f, 132f, 0f, 42f));
+        AddSketchTree(strokes, 64f, -178f, 1.45f, false);
+        AddSketchTree(strokes, 248f, -178f, 1.36f, true);
+        AddSketchTree(strokes, 318f, -178f, 1.12f, false);
+        AddSketchTree(strokes, -30f, -178f, 1.2f, true);
         strokes.Add(Points(8f, -150f, 38f, -134f, 70f, -128f));
         strokes.Add(Points(264f, -128f, 302f, -138f, 338f, -156f));
         strokes.Add(Points(104f, -44f, 134f, -60f, 164f, -56f, 198f, -62f, 226f, -44f));
 
         return strokes;
+    }
+
+    private static void AddSketchTree(List<Vector2[]> strokes, float centerX, float groundY, float scale, bool flipped)
+    {
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, -47f, 64f, -62f, 76f, -67f, 101f, -55f, 126f, -31f, 145f, -4f, 154f, 27f, 153f, 49f, 143f, 65f, 124f, 73f, 98f, 67f, 72f, 50f, 54f, 28f, 44f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, -47f, 64f, -38f, 43f, -16f, 34f, 4f, 35f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, -16f, 0f, -6f, 17f, 1f, 39f, 5f, 64f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 5f, 64f, -47f, 76f, -29f, 59f, 1f, 48f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 5f, 64f, 8f, 92f, 17f, 119f, 28f, 96f, 36f, 82f, 47f, 93f, 57f, 122f, 60f, 68f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 60f, 68f, 75f, 68f, 91f, 62f, 72f, 50f, 50f, 48f, 39f, 36f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 39f, 36f, 42f, 18f, 53f, 0f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 27f, 96f, 37f, 80f, 48f, 92f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, -16f, 0f, -8f, 7f, 2f, 11f));
+        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 53f, 0f, 44f, 8f, 36f, 13f));
+    }
+
+    private static Vector2[] TreePoints(float centerX, float groundY, float scale, bool flipped, params float[] values)
+    {
+        int pointCount = values.Length / 2;
+        Vector2[] points = new Vector2[pointCount];
+        float direction = flipped ? -1f : 1f;
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            points[i] = new Vector2(
+                centerX + values[i * 2] * scale * direction,
+                groundY + values[i * 2 + 1] * scale);
+        }
+
+        return points;
     }
 
     private static Vector2[] Points(params float[] values)

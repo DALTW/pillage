@@ -98,14 +98,12 @@ public class PlayerMove2D : MonoBehaviour
         foreach (Collider2D hit in hits)
         {
             IInteractable interactable = GetInteractableFromCollider(hit);
-            Component component = interactable as Component;
-
-            if (component == null)
+            if (interactable == null)
             {
                 continue;
             }
 
-            float distance = Vector2.Distance(transform.position, component.transform.position);
+            float distance = Vector2.Distance(transform.position, hit.ClosestPoint(transform.position));
 
             if (distance < closestDistance)
             {

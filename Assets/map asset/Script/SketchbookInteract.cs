@@ -8,7 +8,11 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
     [SerializeField] private float openScaleDuration = 0.2f;
 
     private bool isOpen;
+    private bool isFirstDrawingLocked;
+    private bool lockedPlayerMoveWasEnabled;
     private Coroutine scaleRoutine;
+    private PlayerMove2D lockedPlayerMove;
+    private Rigidbody2D lockedPlayerRigidbody;
     private Vector3 openScale = Vector3.one;
 
     private void Start()
@@ -35,7 +39,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
 
     private void Update()
     {
-        if (isOpen && Input.GetKeyDown(KeyCode.Escape))
+        if (isOpen && !isFirstDrawingLocked && Input.GetKeyDown(KeyCode.Escape))
         {
             CloseSketchbook();
         }
@@ -45,15 +49,20 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
     {
         if (isOpen)
         {
+            if (isFirstDrawingLocked)
+            {
+                return;
+            }
+
             CloseSketchbook();
         }
         else
         {
-            OpenSketchbook();
+            OpenSketchbook(interactor);
         }
     }
 
-    private void OpenSketchbook()
+    private void OpenSketchbook(GameObject interactor)
     {
         if (bigSketchbookUI == null)
         {
@@ -64,6 +73,8 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         bool shouldPlayDrawingAnimation = !GameProgress.HasPlayedSketchbookDrawing;
         GameProgress.CheckSketchbook();
         isOpen = true;
+        isFirstDrawingLocked = shouldPlayDrawingAnimation;
+        LockPlayerForFirstDrawing(interactor);
         bigSketchbookUI.SetActive(true);
 
         if (scaleRoutine != null)
@@ -88,12 +99,18 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
 
     private void CloseSketchbook()
     {
+        if (isFirstDrawingLocked)
+        {
+            return;
+        }
+
         if (bigSketchbookUI == null)
         {
             return;
         }
 
         isOpen = false;
+        UnlockPlayerAfterFirstDrawing();
 
         if (scaleRoutine != null)
         {
@@ -114,8 +131,11 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
 
         if (isOpen && shouldPlayDrawingAnimation && sketchbookDrawingAnimation != null)
         {
-            GameProgress.PlaySketchbookDrawing();
-            sketchbookDrawingAnimation.Play();
+            sketchbookDrawingAnimation.Play(CompleteFirstDrawing);
+        }
+        else
+        {
+            UnlockPlayerAfterFirstDrawing();
         }
     }
 
@@ -142,9 +162,56 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         bigSketchbookUI.transform.localScale = end;
     }
 
+    private void LockPlayerForFirstDrawing(GameObject interactor)
+    {
+        if (!isFirstDrawingLocked || interactor == null)
+        {
+            return;
+        }
+
+        lockedPlayerMove = interactor.GetComponent<PlayerMove2D>();
+        lockedPlayerRigidbody = interactor.GetComponent<Rigidbody2D>();
+        lockedPlayerMoveWasEnabled = lockedPlayerMove != null && lockedPlayerMove.enabled;
+
+        if (lockedPlayerRigidbody != null)
+        {
+            lockedPlayerRigidbody.linearVelocity = Vector2.zero;
+        }
+
+        if (lockedPlayerMove != null)
+        {
+            lockedPlayerMove.enabled = false;
+        }
+    }
+
+    private void UnlockPlayerAfterFirstDrawing()
+    {
+        isFirstDrawingLocked = false;
+
+        if (lockedPlayerMove != null)
+        {
+            lockedPlayerMove.enabled = lockedPlayerMoveWasEnabled;
+        }
+
+        lockedPlayerMove = null;
+        lockedPlayerRigidbody = null;
+        lockedPlayerMoveWasEnabled = false;
+    }
+
+    private void CompleteFirstDrawing()
+    {
+        GameProgress.PlaySketchbookDrawing();
+        UnlockPlayerAfterFirstDrawing();
+    }
+
+    private void OnDisable()
+    {
+        UnlockPlayerAfterFirstDrawing();
+    }
+
     private void OnTriggerExit2D(Collider2D other)
     {
-        if (other.CompareTag("Player") && isOpen)
+        if (other.CompareTag("Player") && isOpen && !isFirstDrawingLocked)
         {
             CloseSketchbook();
         }
