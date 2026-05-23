@@ -16,4 +16,14 @@ public class CameraFollow2D : MonoBehaviour
         Vector3 targetPosition = target.position + offset;
         transform.position = Vector3.Lerp(transform.position, targetPosition, smoothSpeed * Time.deltaTime);
     }
+
+    public void SnapToTarget()
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        transform.position = target.position + offset;
+    }
 }

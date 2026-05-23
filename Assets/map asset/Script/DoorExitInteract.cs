@@ -6,7 +6,7 @@ public class DoorExitInteract : MonoBehaviour, IInteractable
     [SerializeField] private Transform exitTarget;
     [SerializeField] private string nextSceneName;
     [SerializeField] private bool playOutsideReveal = true;
-    [SerializeField] private Vector2 interiorReturnOffset = new Vector2(-1.1f, 0f);
+    [SerializeField] private Transform interiorReturnTarget;
 
     public void Interact(GameObject interactor)
     {
@@ -25,12 +25,18 @@ public class DoorExitInteract : MonoBehaviour, IInteractable
         if (exitTarget != null)
         {
             Vector3 exitPosition = exitTarget.position;
-            interactor.transform.position = exitPosition;
 
             if (playOutsideReveal)
             {
-                Vector3 interiorEntryPosition = transform.position + new Vector3(interiorReturnOffset.x, interiorReturnOffset.y, 0f);
+                Vector3 interiorEntryPosition = interiorReturnTarget != null
+                    ? interiorReturnTarget.position
+                    : transform.position;
+
                 SketchOutsideTransition.PlayExit(interactor, exitPosition, interiorEntryPosition);
+            }
+            else
+            {
+                interactor.transform.position = exitPosition;
             }
 
             return;

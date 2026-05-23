@@ -55,6 +55,24 @@ public class PlayerMove2D : MonoBehaviour
         rb.linearVelocity = moveInput * moveSpeed;
     }
 
+    public void ForceIdleMotion()
+    {
+        moveInput = Vector2.zero;
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+        }
+
+        if (animator != null)
+        {
+            animator.SetBool("IsMoving", false);
+            animator.SetFloat("MoveX", 0f);
+            animator.SetFloat("MoveY", 0f);
+            animator.Update(0f);
+        }
+    }
+
     private void InteractWithNearbyTarget()
     {
         IInteractable target = FindNearbyInteractable();
@@ -154,6 +172,7 @@ public class PlayerMove2D : MonoBehaviour
 
     private void OnDisable()
     {
+        ForceIdleMotion();
         nearbyInteractables.Clear();
     }
 

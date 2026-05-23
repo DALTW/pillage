@@ -346,47 +346,43 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         strokes.Add(Points(-178f, -166f, -178f, -128f));
         strokes.Add(Points(-192f, -134f, -192f, -114f, -164f, -114f, -158f, -124f, -164f, -134f, -192f, -134f));
         strokes.Add(Points(-164f, -120f, -146f, -120f, -146f, -108f));
-        strokes.Add(Points(-170f, -178f, -65f, -150f, 16f, -116f, 84f, -76f));
-        strokes.Add(Points(348f, -178f, 286f, -150f, 232f, -112f, 174f, -76f));
-        strokes.Add(Points(84f, -176f, 84f, -18f, 96f, 20f, 124f, 46f, 162f, 56f, 202f, 46f, 232f, 20f, 246f, -18f, 246f, -176f));
-        strokes.Add(Points(118f, -176f, 118f, -54f));
-        strokes.Add(Points(212f, -176f, 212f, -54f));
-        strokes.Add(Points(120f, -54f, 144f, -28f, 166f, -22f, 190f, -28f, 212f, -54f));
-        AddSketchTree(strokes, 64f, -178f, 1.45f, false);
-        AddSketchTree(strokes, 248f, -178f, 1.36f, true);
-        AddSketchTree(strokes, 318f, -178f, 1.12f, false);
-        AddSketchTree(strokes, -30f, -178f, 1.2f, true);
-        strokes.Add(Points(8f, -150f, 38f, -134f, 70f, -128f));
-        strokes.Add(Points(264f, -128f, 302f, -138f, 338f, -156f));
-        strokes.Add(Points(104f, -44f, 134f, -60f, 164f, -56f, 198f, -62f, 226f, -44f));
+        AddSketchForest(strokes);
 
         return strokes;
     }
 
-    private static void AddSketchTree(List<Vector2[]> strokes, float centerX, float groundY, float scale, bool flipped)
+    private static void AddSketchForest(List<Vector2[]> strokes)
     {
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, -47f, 64f, -62f, 76f, -67f, 101f, -55f, 126f, -31f, 145f, -4f, 154f, 27f, 153f, 49f, 143f, 65f, 124f, 73f, 98f, 67f, 72f, 50f, 54f, 28f, 44f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, -47f, 64f, -38f, 43f, -16f, 34f, 4f, 35f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, -16f, 0f, -6f, 17f, 1f, 39f, 5f, 64f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 5f, 64f, -47f, 76f, -29f, 59f, 1f, 48f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 5f, 64f, 8f, 92f, 17f, 119f, 28f, 96f, 36f, 82f, 47f, 93f, 57f, 122f, 60f, 68f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 60f, 68f, 75f, 68f, 91f, 62f, 72f, 50f, 50f, 48f, 39f, 36f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 39f, 36f, 42f, 18f, 53f, 0f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 27f, 96f, 37f, 80f, 48f, 92f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, -16f, 0f, -8f, 7f, 2f, 11f));
-        strokes.Add(TreePoints(centerX, groundY, scale, flipped, 53f, 0f, 44f, 8f, 36f, 13f));
+        strokes.Add(Points(-170f, -178f, -92f, -158f, -18f, -128f, 46f, -104f, 102f, -96f));
+        strokes.Add(Points(76f, -178f, 126f, -166f, 176f, -172f, 230f, -164f, 286f, -176f, 350f, -168f));
+        strokes.Add(Points(108f, -86f, 128f, -118f, 146f, -92f, 166f, -132f, 186f, -94f, 210f, -140f, 234f, -98f, 258f, -132f, 284f, -90f, 314f, -116f, 340f, -86f));
+        AddSketchPine(strokes, 118f, -176f, 0.82f);
+        AddSketchPine(strokes, 164f, -176f, 1.02f);
+        AddSketchPine(strokes, 218f, -176f, 0.9f);
+        AddSketchPine(strokes, 274f, -176f, 1.14f);
+        AddSketchPine(strokes, 332f, -176f, 0.86f);
+        strokes.Add(Points(146f, -176f, 160f, -138f, 174f, -116f, 190f, -100f));
+        strokes.Add(Points(246f, -176f, 238f, -140f, 224f, -116f, 202f, -100f));
+        strokes.Add(Points(96f, -54f, 124f, -68f, 154f, -60f, 184f, -72f, 216f, -58f, 248f, -70f, 280f, -52f));
     }
 
-    private static Vector2[] TreePoints(float centerX, float groundY, float scale, bool flipped, params float[] values)
+    private static void AddSketchPine(List<Vector2[]> strokes, float centerX, float groundY, float scale)
+    {
+        strokes.Add(PinePoints(centerX, groundY, scale, 0f, 126f, -36f, 82f, -22f, 82f, -48f, 44f, -26f, 44f, -60f, 0f, 60f, 0f, 26f, 44f, 48f, 44f, 22f, 82f, 36f, 82f, 0f, 126f));
+        strokes.Add(PinePoints(centerX, groundY, scale, -8f, 0f, -8f, -18f, 8f, -18f, 8f, 0f));
+        strokes.Add(PinePoints(centerX, groundY, scale, -26f, 44f, -8f, 62f, 8f, 44f));
+        strokes.Add(PinePoints(centerX, groundY, scale, -22f, 82f, -6f, 98f, 10f, 82f));
+    }
+
+    private static Vector2[] PinePoints(float centerX, float groundY, float scale, params float[] values)
     {
         int pointCount = values.Length / 2;
         Vector2[] points = new Vector2[pointCount];
-        float direction = flipped ? -1f : 1f;
 
         for (int i = 0; i < pointCount; i++)
         {
             points[i] = new Vector2(
-                centerX + values[i * 2] * scale * direction,
+                centerX + values[i * 2] * scale,
                 groundY + values[i * 2 + 1] * scale);
         }
 
