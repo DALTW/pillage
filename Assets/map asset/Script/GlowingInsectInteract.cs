@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public class GlowingInsectInteract : MonoBehaviour, IInteractable
@@ -24,6 +25,7 @@ public class GlowingInsectInteract : MonoBehaviour, IInteractable
     private Vector3 baseLocalPosition;
     private float seed;
     private bool captured;
+    private bool dockedAtFishingRod;
 
     public static GlowingInsectInteract Spawn(Vector3 worldPosition, Transform parent)
     {
@@ -50,8 +52,20 @@ public class GlowingInsectInteract : MonoBehaviour, IInteractable
             return;
         }
 
+        if (!FishingRodInteract.TryReserveInsectDockPosition(out Vector3 dockPosition, out Transform dockParent))
+        {
+            return;
+        }
+
         captured = true;
-        Destroy(gameObject);
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+
+        SetColliderEnabled(false);
+        StartCoroutine(FlyToFishingRodRoutine(dockPosition, dockParent));
     }
 
     private void Awake()
@@ -76,7 +90,7 @@ public class GlowingInsectInteract : MonoBehaviour, IInteractable
 
     private void Update()
     {
-        if (captured)
+        if (captured || dockedAtFishingRod)
         {
             return;
         }
@@ -144,8 +158,79 @@ public class GlowingInsectInteract : MonoBehaviour, IInteractable
         }
 
         bool shouldShowPrompt = player != null
+            && FishingRodInteract.CanAcceptGlowingInsect()
             && Vector2.Distance(transform.position, player.position) <= promptDistance;
         promptObject.SetActive(shouldShowPrompt);
+    }
+
+    public void MarkDockedAtFishingRod(Vector3 worldPosition)
+    {
+        dockedAtFishingRod = true;
+        captured = true;
+        transform.position = worldPosition;
+        baseLocalPosition = transform.localPosition;
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+
+        SetColliderEnabled(false);
+    }
+
+    private IEnumerator FlyToFishingRodRoutine(Vector3 targetPosition, Transform targetParent)
+    {
+        Vector3 startPosition = transform.position;
+        Vector3 startScale = transform.localScale;
+        const float flightDuration = 0.72f;
+        float elapsed = 0f;
+
+        while (elapsed < flightDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / flightDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            Vector3 position = Vector3.Lerp(startPosition, targetPosition, easedProgress);
+            position.y += Mathf.Sin(progress * Mathf.PI) * 0.48f;
+
+            transform.position = position;
+            transform.localScale = Vector3.Lerp(startScale, Vector3.one * 0.82f, easedProgress);
+
+            if (visualRoot != null)
+            {
+                visualRoot.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin((Time.time + seed) * 12f) * 18f);
+            }
+
+            float wingAngle = Mathf.Sin((Time.time + seed) * flutterSpeed * 1.4f) * 30f;
+            if (leftWing != null)
+            {
+                leftWing.localRotation = Quaternion.Euler(0f, 0f, 22f + wingAngle);
+            }
+
+            if (rightWing != null)
+            {
+                rightWing.localRotation = Quaternion.Euler(0f, 0f, -22f - wingAngle);
+            }
+
+            yield return null;
+        }
+
+        if (targetParent != null)
+        {
+            transform.SetParent(targetParent, true);
+        }
+
+        transform.position = targetPosition;
+        FishingRodInteract.CompleteInsectDock(transform);
+    }
+
+    private void SetColliderEnabled(bool enabled)
+    {
+        Collider2D[] colliders = GetComponents<Collider2D>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            colliders[i].enabled = enabled;
+        }
     }
 
     private void EnsureVisual()

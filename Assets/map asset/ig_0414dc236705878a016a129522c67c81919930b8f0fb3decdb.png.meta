@@ -1,15 +1,15 @@
 fileFormatVersion: 2
-guid: 437914db78375944cb784404a6831e6c
+guid: f5eabcb949664ff4cbefe43b43a2ec97
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 1863586531637332880
-    second: boy_character_transparent_0
+      213: 173508414817226088
+    second: ig_0414dc236705878a016a129522c67c81919930b8f0fb3decdb_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 1
+    enableMipMap: 0
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 2
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -45,7 +45,7 @@ TextureImporter:
     wrapW: 1
   nPOTScale: 0
   lightmap: 0
-  compressionQuality: 100
+  compressionQuality: 50
   spriteMode: 2
   spriteExtrude: 1
   spriteMeshType: 1
@@ -63,7 +63,7 @@ TextureImporter:
   flipbookRows: 1
   flipbookColumns: 1
   maxTextureSizeSet: 0
-  compressionQualitySet: 1
+  compressionQualitySet: 0
   textureFormatSet: 0
   ignorePngGamma: 0
   applyGammaDecoding: 0
@@ -75,8 +75,8 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
-    compressionQuality: 100
+    textureCompression: 1
+    compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
     overridden: 0
@@ -88,8 +88,8 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
-    compressionQuality: 100
+    textureCompression: 1
+    compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
     overridden: 0
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: boy_character_transparent_0
+      name: ig_0414dc236705878a016a129522c67c81919930b8f0fb3decdb_0
       rect:
         serializedVersion: 2
-        x: 483
-        y: 346
-        width: 286
-        height: 655
+        x: 0
+        y: 0
+        width: 1448
+        height: 1086
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 09b027aa31accd910800000000000000
-      internalID: 1863586531637332880
+      spriteID: 86dc8b6ebfc686200800000000000000
+      internalID: 173508414817226088
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      boy_character_transparent_0: 1863586531637332880
+      ig_0414dc236705878a016a129522c67c81919930b8f0fb3decdb_0: 173508414817226088
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

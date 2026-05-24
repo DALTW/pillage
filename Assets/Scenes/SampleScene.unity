@@ -608,7 +608,7 @@ Camera:
   m_TargetDisplay: 0
   m_TargetEye: 0
   m_HDR: 1
-  m_AllowMSAA: 0
+  m_AllowMSAA: 1
   m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
   m_OcclusionCulling: 0
@@ -1129,6 +1129,14 @@ MonoBehaviour:
   player: {fileID: 633801418}
   promptObject: {fileID: 294847083}
   showDistance: 2
+  promptWorldOffset: {x: 0, y: 1.15, z: 0}
+  promptWorldScale: {x: 1, y: 1, z: 1}
+  promptFontSize: 72
+  promptCharacterSize: 0.08
+  promptColor: {r: 1, g: 0.92, b: 0.72, a: 1}
+  promptShadowColor: {r: 0, g: 0, b: 0, a: 0.65}
+  promptShadowOffset: {x: 0.035, y: -0.035, z: 0}
+  promptSortingOrder: 70
 --- !u!61 &995576792
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -2002,7 +2010,7 @@ BoxCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 12.54, y: 12.54}
+    oldSize: {x: 10.49, y: 8.51}
     newSize: {x: 12.54, y: 12.54}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
@@ -2059,7 +2067,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 2
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: a3844247330f5bb4a90cf07a9b04c27b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: dcbde7a949be4b899cccd23ad77fd723, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -2100,6 +2108,14 @@ MonoBehaviour:
   player: {fileID: 633801418}
   promptObject: {fileID: 1234077549}
   showDistance: 2
+  promptWorldOffset: {x: 0, y: 1.15, z: 0}
+  promptWorldScale: {x: 1, y: 1, z: 1}
+  promptFontSize: 72
+  promptCharacterSize: 0.08
+  promptColor: {r: 1, g: 0.92, b: 0.72, a: 1}
+  promptShadowColor: {r: 0, g: 0, b: 0, a: 0.65}
+  promptShadowOffset: {x: 0.035, y: -0.035, z: 0}
+  promptSortingOrder: 70
 --- !u!1 &1747531259
 GameObject:
   m_ObjectHideFlags: 0
@@ -2350,7 +2366,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -7550341689501764477, guid: 039830a76c7945848b3564bdf50a4310, type: 3}
+  m_Sprite: {fileID: 21300000, guid: dcbde7a949be4b899cccd23ad77fd723, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1

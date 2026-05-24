@@ -71,9 +71,11 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         }
 
         bool shouldPlayDrawingAnimation = !GameProgress.HasPlayedSketchbookDrawing;
+        bool shouldPlayForestExpansion = !shouldPlayDrawingAnimation && GameProgress.CanExtendPencilAtSketchbook;
+        bool shouldPlayGreenColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && GameProgress.CanColorVillageAtSketchbook;
         GameProgress.CheckSketchbook();
         isOpen = true;
-        isFirstDrawingLocked = shouldPlayDrawingAnimation;
+        isFirstDrawingLocked = shouldPlayDrawingAnimation || shouldPlayForestExpansion || shouldPlayGreenColoring;
         LockPlayerForFirstDrawing(interactor);
         bigSketchbookUI.SetActive(true);
 
@@ -94,7 +96,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
             }
         }
 
-        scaleRoutine = StartCoroutine(OpenScaleUI(bigSketchbookUI.transform.localScale, shouldPlayDrawingAnimation));
+        scaleRoutine = StartCoroutine(OpenScaleUI(bigSketchbookUI.transform.localScale, shouldPlayDrawingAnimation, shouldPlayForestExpansion, shouldPlayGreenColoring));
     }
 
     private void CloseSketchbook()
@@ -125,13 +127,25 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         scaleRoutine = StartCoroutine(CloseScaleUI());
     }
 
-    private IEnumerator OpenScaleUI(Vector3 startScale, bool shouldPlayDrawingAnimation)
+    private IEnumerator OpenScaleUI(Vector3 startScale, bool shouldPlayDrawingAnimation, bool shouldPlayForestExpansion, bool shouldPlayGreenColoring)
     {
         yield return ScaleUI(startScale, openScale);
 
         if (isOpen && shouldPlayDrawingAnimation && sketchbookDrawingAnimation != null)
         {
             sketchbookDrawingAnimation.Play(CompleteFirstDrawing);
+        }
+        else if (isOpen && shouldPlayForestExpansion && sketchbookDrawingAnimation != null)
+        {
+            sketchbookDrawingAnimation.PlayForestExpansion(CompleteForestExpansionDrawing);
+        }
+        else if (isOpen && shouldPlayGreenColoring && sketchbookDrawingAnimation != null)
+        {
+            sketchbookDrawingAnimation.PlayVillageGreenColoring(CompleteVillageGreenColoring);
+        }
+        else if (isOpen && shouldPlayGreenColoring)
+        {
+            CompleteVillageGreenColoring();
         }
         else
         {
@@ -201,6 +215,22 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
     private void CompleteFirstDrawing()
     {
         GameProgress.PlaySketchbookDrawing();
+        UnlockPlayerAfterFirstDrawing();
+    }
+
+    private void CompleteForestExpansionDrawing()
+    {
+        GameProgress.CompleteSketchbookForestDrawing();
+        PencilFragmentHud.ShowCollected();
+        SketchOutsideTransition.ApplySketchbookForestUnlock();
+        UnlockPlayerAfterFirstDrawing();
+    }
+
+    private void CompleteVillageGreenColoring()
+    {
+        GameProgress.ColorVillageGreen();
+        PencilFragmentHud.ShowCollected();
+        SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
         UnlockPlayerAfterFirstDrawing();
     }
 

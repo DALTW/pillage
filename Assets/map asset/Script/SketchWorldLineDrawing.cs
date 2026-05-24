@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class SketchWorldLineDrawing : MonoBehaviour
 {
+    private static readonly List<SketchWorldLineDrawing> ActiveDrawings = new List<SketchWorldLineDrawing>();
+    private static float globalLineWidthMultiplier = 1f;
+
     [SerializeField] private float lineWidth = 0.06f;
     [SerializeField] private Color lineColor = new Color32(35, 32, 28, 255);
     [SerializeField] private int sortingOrder = 8;
@@ -22,6 +25,39 @@ public class SketchWorldLineDrawing : MonoBehaviour
             revealProgress = Mathf.Clamp01(value);
             UpdateRenderers();
         }
+    }
+
+    private float EffectiveLineWidth => Mathf.Max(0.01f, lineWidth * globalLineWidthMultiplier);
+
+    public static void SetGlobalLineWidthMultiplier(float multiplier)
+    {
+        globalLineWidthMultiplier = Mathf.Max(0.1f, multiplier);
+
+        for (int i = ActiveDrawings.Count - 1; i >= 0; i--)
+        {
+            if (ActiveDrawings[i] == null)
+            {
+                ActiveDrawings.RemoveAt(i);
+                continue;
+            }
+
+            ActiveDrawings[i].RefreshLineWidths();
+        }
+    }
+
+    private void OnEnable()
+    {
+        if (!ActiveDrawings.Contains(this))
+        {
+            ActiveDrawings.Add(this);
+        }
+
+        RefreshLineWidths();
+    }
+
+    private void OnDisable()
+    {
+        ActiveDrawings.Remove(this);
     }
 
     public void Configure(float width, Color color, int order)
@@ -103,12 +139,26 @@ public class SketchWorldLineDrawing : MonoBehaviour
         lineRenderer.material = lineMaterial;
         lineRenderer.startColor = lineColor;
         lineRenderer.endColor = lineColor;
-        lineRenderer.startWidth = lineWidth;
-        lineRenderer.endWidth = lineWidth;
-        lineRenderer.numCapVertices = 4;
-        lineRenderer.numCornerVertices = 4;
+        lineRenderer.startWidth = EffectiveLineWidth;
+        lineRenderer.endWidth = EffectiveLineWidth;
+        lineRenderer.numCapVertices = 8;
+        lineRenderer.numCornerVertices = 8;
         lineRenderer.sortingOrder = sortingOrder;
         lineRenderer.positionCount = 0;
+    }
+
+    private void RefreshLineWidths()
+    {
+        for (int i = 0; i < renderers.Count; i++)
+        {
+            if (renderers[i] == null)
+            {
+                continue;
+            }
+
+            renderers[i].startWidth = EffectiveLineWidth;
+            renderers[i].endWidth = EffectiveLineWidth;
+        }
     }
 
     private void EnsureLineMaterial()
@@ -202,6 +252,8 @@ public class SketchWorldLineDrawing : MonoBehaviour
 
     private void OnDestroy()
     {
+        ActiveDrawings.Remove(this);
+
         if (lineMaterial != null)
         {
             Destroy(lineMaterial);

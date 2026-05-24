@@ -1,22 +1,59 @@
 using UnityEngine;
 
-public class GrassSwayOnPlayerNear : MonoBehaviour
+public class GrassSwayOnPlayerNear : MonoBehaviour, IInteractable
 {
     [SerializeField] private float reactionRadius = 1.15f;
     [SerializeField] private float maxTiltAngle = 13f;
     [SerializeField] private float swaySpeed = 13f;
     [SerializeField] private float recoverSpeed = 8f;
     [SerializeField] private float squashAmount = 0.08f;
-    [SerializeField, Range(0f, 1f)] private float insectSpawnChance = 0.1f;
+    [SerializeField, Range(0f, 1f)] private float insectSpawnChance = 0.25f;
+
+    private const float LetterPromptDistance = 1.45f;
+    private const int LetterPromptSortingOrder = 72;
 
     private Transform player;
     private Rigidbody2D playerRigidbody;
+    private GameObject letterPromptObject;
+    private CircleCollider2D letterInteractionCollider;
     private Vector3 baseScale;
     private Quaternion baseRotation;
     private float swayVelocity;
     private float currentTilt;
     private float currentSquash;
     private bool hasTriedInsectSpawn;
+    private bool suppressInsectSpawn;
+    private bool containsLetterFragment;
+    private bool hasReleasedLetterFragment;
+
+    public void MarkReservedForLetterFragment()
+    {
+        suppressInsectSpawn = true;
+    }
+
+    public void MarkContainsLetterFragment()
+    {
+        suppressInsectSpawn = true;
+        containsLetterFragment = true;
+        hasReleasedLetterFragment = false;
+        EnsureLetterInteraction();
+        SetLetterInteractionAvailable(isActiveAndEnabled);
+    }
+
+    public void Interact(GameObject interactor)
+    {
+        if (!containsLetterFragment || hasReleasedLetterFragment || interactor == null)
+        {
+            return;
+        }
+
+        if (Vector2.Distance(transform.position, interactor.transform.position) > LetterPromptDistance)
+        {
+            return;
+        }
+
+        TryReleaseContainedLetterFragment();
+    }
 
     private void Awake()
     {
@@ -31,6 +68,13 @@ public class GrassSwayOnPlayerNear : MonoBehaviour
         currentSquash = 0f;
         transform.localRotation = baseRotation;
         transform.localScale = baseScale;
+
+        SetLetterInteractionAvailable(containsLetterFragment && !hasReleasedLetterFragment);
+    }
+
+    private void OnDisable()
+    {
+        SetLetterInteractionAvailable(false);
     }
 
     private void Update()
@@ -57,9 +101,16 @@ public class GrassSwayOnPlayerNear : MonoBehaviour
                 targetTilt = side * maxTiltAngle * proximity + flutter * maxTiltAngle * proximity;
                 targetSquash = squashAmount * proximity;
 
-                if (proximity >= 0.2f && IsPlayerMovingThroughGrass())
+                if (proximity >= 0.2f)
                 {
-                    TrySpawnGlowingInsect();
+                    if (containsLetterFragment)
+                    {
+                        TryReleaseContainedLetterFragment();
+                    }
+                    else if (!suppressInsectSpawn && IsPlayerMovingThroughGrass())
+                    {
+                        TrySpawnGlowingInsect();
+                    }
                 }
             }
         }
@@ -73,6 +124,8 @@ public class GrassSwayOnPlayerNear : MonoBehaviour
             baseScale.x * (1f + currentSquash * 0.35f),
             baseScale.y * (1f - currentSquash),
             baseScale.z);
+
+        UpdateLetterPrompt();
     }
 
     private void TrySpawnGlowingInsect()
@@ -91,6 +144,92 @@ public class GrassSwayOnPlayerNear : MonoBehaviour
 
         Vector3 spawnOffset = new Vector3(Random.Range(-0.18f, 0.18f), Random.Range(0.2f, 0.45f), 0f);
         GlowingInsectInteract.Spawn(transform.position + spawnOffset, transform.parent);
+    }
+
+    private void TryReleaseContainedLetterFragment()
+    {
+        if (hasReleasedLetterFragment)
+        {
+            return;
+        }
+
+        if (LetterQuestWorldDrop.TrySpawnFinalGrassLetterFragmentFrom(transform))
+        {
+            hasReleasedLetterFragment = true;
+            containsLetterFragment = false;
+            SetLetterInteractionAvailable(false);
+        }
+    }
+
+    private void EnsureLetterInteraction()
+    {
+        if (letterInteractionCollider == null)
+        {
+            letterInteractionCollider = gameObject.AddComponent<CircleCollider2D>();
+            letterInteractionCollider.isTrigger = true;
+            letterInteractionCollider.radius = 0.78f;
+            letterInteractionCollider.enabled = false;
+        }
+
+        if (letterPromptObject != null)
+        {
+            return;
+        }
+
+        letterPromptObject = new GameObject("GeneratedGrassLetterPrompt");
+        letterPromptObject.transform.SetParent(transform, false);
+        letterPromptObject.transform.localPosition = new Vector3(0f, 0.72f, 0f);
+
+        TextMesh textMesh = letterPromptObject.AddComponent<TextMesh>();
+        textMesh.text = "E";
+        textMesh.anchor = TextAnchor.MiddleCenter;
+        textMesh.alignment = TextAlignment.Center;
+        textMesh.fontSize = 64;
+        textMesh.characterSize = 0.075f;
+        textMesh.color = new Color32(35, 32, 28, 255);
+
+        MeshRenderer meshRenderer = letterPromptObject.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            meshRenderer.sortingOrder = LetterPromptSortingOrder;
+        }
+
+        letterPromptObject.SetActive(false);
+    }
+
+    private void SetLetterInteractionAvailable(bool available)
+    {
+        if (available)
+        {
+            EnsureLetterInteraction();
+        }
+
+        if (letterInteractionCollider != null)
+        {
+            letterInteractionCollider.enabled = available;
+        }
+
+        if (!available && letterPromptObject != null)
+        {
+            letterPromptObject.SetActive(false);
+        }
+    }
+
+    private void UpdateLetterPrompt()
+    {
+        if (!containsLetterFragment || hasReleasedLetterFragment || letterPromptObject == null)
+        {
+            if (letterPromptObject != null)
+            {
+                letterPromptObject.SetActive(false);
+            }
+
+            return;
+        }
+
+        bool shouldShowPrompt = player != null
+            && Vector2.Distance(transform.position, player.position) <= LetterPromptDistance;
+        letterPromptObject.SetActive(shouldShowPrompt);
     }
 
     private bool IsPlayerMovingThroughGrass()
