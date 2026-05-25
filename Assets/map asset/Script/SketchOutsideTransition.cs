@@ -16,7 +16,7 @@ public class SketchOutsideTransition : MonoBehaviour
     private const float OutsideCameraSizeMultiplier = 1.5f;
     private const int BackgroundSortingOrder = -20;
     private const int PropSortingOrder = 20;
-    private const int PathSortingOrder = PropSortingOrder - 2;
+    private const int PathSortingOrder = 5;
     private const int GrassSortingOrder = PropSortingOrder + 1;
     private const int TreeSortingOrder = PropSortingOrder + 3;
     private const int MailboxSortingOrder = PropSortingOrder + 4;
@@ -45,6 +45,7 @@ public class SketchOutsideTransition : MonoBehaviour
     private const string MailboxResourcePath = "Outside/mailbox_thick";
     private static readonly Color VillageGreenColor = new Color32(69, 158, 72, 255);
     private static readonly Color VillageGrassLightGreenColor = new Color32(151, 214, 83, 255);
+    private static readonly Dictionary<Sprite, Sprite> GrassColorOverlaySpriteCache = new Dictionary<Sprite, Sprite>();
     private static readonly Vector2 GrassScaleRange = new Vector2(0.5508f, 0.8424f);
     private static readonly Vector2 TreeScaleRange = new Vector2(1.12f, 1.32f);
     private static readonly Vector3 OutsidePlayerOffset = Vector3.zero;
@@ -1052,6 +1053,7 @@ public class SketchOutsideTransition : MonoBehaviour
             }
 
             ApplyGrassLightGreenColor(spriteRenderer);
+            CreateGrassColorOverlay(spriteRenderer);
         }
     }
 
@@ -1137,6 +1139,54 @@ public class SketchOutsideTransition : MonoBehaviour
             || objectName == "GeneratedQuestNpcLetterGrass";
     }
 
+    private void CreateGrassColorOverlay(SpriteRenderer spriteRenderer)
+    {
+        if (spriteRenderer == null || spriteRenderer.sprite == null || spriteRenderer.transform.Find("GeneratedGrassGreenOverlay") != null)
+        {
+            return;
+        }
+
+        Sprite overlaySprite = GetGrassColorOverlaySprite(spriteRenderer.sprite);
+        if (overlaySprite == null)
+        {
+            return;
+        }
+
+        GameObject overlayObject = new GameObject("GeneratedGrassGreenOverlay");
+        overlayObject.transform.SetParent(spriteRenderer.transform, false);
+        overlayObject.transform.localPosition = Vector3.zero;
+        overlayObject.transform.localRotation = Quaternion.identity;
+        overlayObject.transform.localScale = Vector3.one;
+
+        SpriteRenderer overlayRenderer = overlayObject.AddComponent<SpriteRenderer>();
+        overlayRenderer.sprite = overlaySprite;
+        overlayRenderer.sortingOrder = spriteRenderer.sortingOrder + 1;
+
+        Color overlayColor = VillageGrassLightGreenColor;
+        overlayColor.a = 0.86f;
+        overlayRenderer.color = overlayColor;
+
+        GrassCrayonColorOverlay overlaySync = overlayObject.AddComponent<GrassCrayonColorOverlay>();
+        overlaySync.Configure(spriteRenderer, overlayRenderer, overlayColor);
+    }
+
+    private static Sprite GetGrassColorOverlaySprite(Sprite sourceSprite)
+    {
+        if (sourceSprite == null)
+        {
+            return null;
+        }
+
+        if (GrassColorOverlaySpriteCache.TryGetValue(sourceSprite, out Sprite cachedSprite))
+        {
+            return cachedSprite;
+        }
+
+        Sprite overlaySprite = CreateGrassColorOverlaySprite(sourceSprite);
+        GrassColorOverlaySpriteCache[sourceSprite] = overlaySprite;
+        return overlaySprite;
+    }
+
     private static void ApplyGrassLightGreenColor(SpriteRenderer spriteRenderer)
     {
         if (spriteRenderer == null)
@@ -1147,6 +1197,91 @@ public class SketchOutsideTransition : MonoBehaviour
         Color color = VillageGrassLightGreenColor;
         color.a = spriteRenderer.color.a;
         spriteRenderer.color = color;
+    }
+
+    private static Sprite CreateGrassColorOverlaySprite(Sprite sourceSprite)
+    {
+        Texture2D sourceTexture = sourceSprite.texture;
+        if (sourceTexture == null)
+        {
+            return null;
+        }
+
+        Rect sourceRect = sourceSprite.rect;
+        int rectX = Mathf.RoundToInt(sourceRect.x);
+        int rectY = Mathf.RoundToInt(sourceRect.y);
+        int width = Mathf.RoundToInt(sourceRect.width);
+        int height = Mathf.RoundToInt(sourceRect.height);
+
+        Color32[] sourcePixels;
+        try
+        {
+            sourcePixels = sourceTexture.GetPixels32();
+        }
+        catch (UnityException)
+        {
+            return sourceSprite;
+        }
+
+        Color32[] overlayPixels = new Color32[width * height];
+        const int dilationRadius = 4;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                byte alpha = GetMaxAlphaInRadius(sourcePixels, sourceTexture.width, sourceTexture.height, rectX + x, rectY + y, dilationRadius);
+                overlayPixels[y * width + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 0.88f));
+            }
+        }
+
+        Texture2D overlayTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        overlayTexture.name = $"{sourceSprite.name}_GreenCrayonOverlayTexture";
+        overlayTexture.filterMode = sourceTexture.filterMode;
+        overlayTexture.wrapMode = TextureWrapMode.Clamp;
+        overlayTexture.SetPixels32(overlayPixels);
+        overlayTexture.Apply();
+
+        Vector2 normalizedPivot = new Vector2(
+            sourceSprite.pivot.x / Mathf.Max(1f, sourceRect.width),
+            sourceSprite.pivot.y / Mathf.Max(1f, sourceRect.height));
+
+        Sprite overlaySprite = Sprite.Create(
+            overlayTexture,
+            new Rect(0f, 0f, width, height),
+            normalizedPivot,
+            sourceSprite.pixelsPerUnit);
+        overlaySprite.name = $"{sourceSprite.name}_GreenCrayonOverlay";
+        return overlaySprite;
+    }
+
+    private static byte GetMaxAlphaInRadius(Color32[] pixels, int textureWidth, int textureHeight, int centerX, int centerY, int radius)
+    {
+        byte maxAlpha = 0;
+
+        for (int y = centerY - radius; y <= centerY + radius; y++)
+        {
+            if (y < 0 || y >= textureHeight)
+            {
+                continue;
+            }
+
+            for (int x = centerX - radius; x <= centerX + radius; x++)
+            {
+                if (x < 0 || x >= textureWidth)
+                {
+                    continue;
+                }
+
+                byte alpha = pixels[y * textureWidth + x].a;
+                if (alpha > maxAlpha)
+                {
+                    maxAlpha = alpha;
+                }
+            }
+        }
+
+        return maxAlpha;
     }
 
     private static bool IsInsideVillageFence(Vector3 localPosition)
@@ -1765,6 +1900,11 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         RegisterSpriteReveal(spriteRenderer, localPosition, enableWhenRevealed);
+        if (GameProgress.HasColoredVillageGreen && IsGrassColoringTarget(objectName))
+        {
+            CreateGrassColorOverlay(spriteRenderer);
+        }
+
         CreatePropGroundStroke(objectName, localPosition, sprite.bounds.extents.x * Mathf.Abs(localScale.x), sortingOrder - 1, parent);
         return propObject.transform;
     }
@@ -3278,6 +3418,39 @@ public class TreeCrayonColorTarget : MonoBehaviour
     public void Configure(float treeScale)
     {
         TreeScale = Mathf.Max(0.1f, treeScale);
+    }
+}
+
+public class GrassCrayonColorOverlay : MonoBehaviour
+{
+    private SpriteRenderer sourceRenderer;
+    private SpriteRenderer overlayRenderer;
+    private Color baseOverlayColor = Color.white;
+
+    public void Configure(SpriteRenderer source, SpriteRenderer overlay, Color overlayColor)
+    {
+        sourceRenderer = source;
+        overlayRenderer = overlay;
+        baseOverlayColor = overlayColor;
+        SyncOverlay();
+    }
+
+    private void LateUpdate()
+    {
+        SyncOverlay();
+    }
+
+    private void SyncOverlay()
+    {
+        if (sourceRenderer == null || overlayRenderer == null)
+        {
+            return;
+        }
+
+        Color color = baseOverlayColor;
+        color.a *= sourceRenderer.color.a;
+        overlayRenderer.color = color;
+        overlayRenderer.enabled = sourceRenderer.enabled;
     }
 }
 

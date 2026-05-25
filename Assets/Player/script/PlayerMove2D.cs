@@ -3,6 +3,12 @@ using UnityEngine;
 
 public class PlayerMove2D : MonoBehaviour
 {
+    private const string IdleStateName = "Player2_Idle";
+    private const string RunUpStateName = "Player2_RunUp";
+    private const string RunDownStateName = "Player2_RunDown";
+    private const string RunRightStateName = "Player2_RunRight";
+    private const string RunLeftStateName = "Player2_RunLeft";
+
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private KeyCode interactKey = KeyCode.E;
     [SerializeField] private float interactRange = 1.2f;
@@ -10,13 +16,16 @@ public class PlayerMove2D : MonoBehaviour
 
     private readonly List<IInteractable> nearbyInteractables = new List<IInteractable>();
     private Rigidbody2D rb;
+    private Collider2D playerCollider;
     private SpriteRenderer spriteRenderer;
     private Animator animator;
     private Vector2 moveInput;
+    private int currentAnimationHash;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        playerCollider = GetComponent<Collider2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
     }
@@ -28,18 +37,24 @@ public class PlayerMove2D : MonoBehaviour
 
         moveInput = new Vector2(x, y).normalized;
 
-        if (animator != null)
+        if (animator != null && animator.isActiveAndEnabled)
         {
             animator.SetBool("IsMoving", moveInput.sqrMagnitude > 0f);
             animator.SetFloat("MoveX", x);
             animator.SetFloat("MoveY", y);
         }
 
-        if (x > 0)
+        bool usingDirectionalAnimator = UpdateDirectionalAnimation(x, y);
+
+        if (spriteRenderer != null && usingDirectionalAnimator)
         {
             spriteRenderer.flipX = false;
         }
-        else if (x < 0)
+        else if (spriteRenderer != null && x > 0)
+        {
+            spriteRenderer.flipX = false;
+        }
+        else if (spriteRenderer != null && x < 0)
         {
             spriteRenderer.flipX = true;
         }
@@ -52,6 +67,11 @@ public class PlayerMove2D : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (rb == null)
+        {
+            return;
+        }
+
         rb.linearVelocity = moveInput * moveSpeed;
     }
 
@@ -64,11 +84,13 @@ public class PlayerMove2D : MonoBehaviour
             rb.linearVelocity = Vector2.zero;
         }
 
-        if (animator != null)
+        if (animator != null && animator.isActiveAndEnabled)
         {
             animator.SetBool("IsMoving", false);
             animator.SetFloat("MoveX", 0f);
             animator.SetFloat("MoveY", 0f);
+            currentAnimationHash = 0;
+            UpdateDirectionalAnimation(0f, 0f);
             animator.Update(0f);
         }
     }
@@ -90,6 +112,7 @@ public class PlayerMove2D : MonoBehaviour
     {
         IInteractable closestTarget = null;
         float closestDistance = float.MaxValue;
+        Vector2 interactionCenter = GetInteractionCenter();
 
         for (int i = nearbyInteractables.Count - 1; i >= 0; i--)
         {
@@ -102,7 +125,7 @@ public class PlayerMove2D : MonoBehaviour
                 continue;
             }
 
-            float distance = Vector2.Distance(transform.position, component.transform.position);
+            float distance = Vector2.Distance(interactionCenter, component.transform.position);
 
             if (distance < closestDistance)
             {
@@ -111,7 +134,7 @@ public class PlayerMove2D : MonoBehaviour
             }
         }
 
-        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, interactRange, interactableLayers);
+        Collider2D[] hits = Physics2D.OverlapCircleAll(interactionCenter, interactRange, interactableLayers);
 
         foreach (Collider2D hit in hits)
         {
@@ -121,7 +144,7 @@ public class PlayerMove2D : MonoBehaviour
                 continue;
             }
 
-            float distance = Vector2.Distance(transform.position, hit.ClosestPoint(transform.position));
+            float distance = Vector2.Distance(interactionCenter, hit.ClosestPoint(interactionCenter));
 
             if (distance < closestDistance)
             {
@@ -176,9 +199,74 @@ public class PlayerMove2D : MonoBehaviour
         nearbyInteractables.Clear();
     }
 
+    private Vector2 GetInteractionCenter()
+    {
+        Collider2D centerCollider = playerCollider;
+
+        if (centerCollider == null)
+        {
+            centerCollider = GetComponent<Collider2D>();
+        }
+
+        return centerCollider != null ? centerCollider.bounds.center : transform.position;
+    }
+
+    private bool UpdateDirectionalAnimation(float x, float y)
+    {
+        if (animator == null || !animator.isActiveAndEnabled)
+        {
+            return false;
+        }
+
+        string stateName = IdleStateName;
+
+        if (moveInput.sqrMagnitude > 0f)
+        {
+            if (Mathf.Abs(x) >= Mathf.Abs(y))
+            {
+                stateName = x >= 0f ? RunRightStateName : RunLeftStateName;
+            }
+            else
+            {
+                stateName = y >= 0f ? RunUpStateName : RunDownStateName;
+            }
+        }
+
+        return PlayAnimatorStateIfAvailable(stateName);
+    }
+
+    private bool PlayAnimatorStateIfAvailable(string stateName)
+    {
+        int stateHash = Animator.StringToHash(stateName);
+        int fullPathHash = Animator.StringToHash("Base Layer." + stateName);
+        int playableHash = 0;
+
+        if (animator.HasState(0, stateHash))
+        {
+            playableHash = stateHash;
+        }
+        else if (animator.HasState(0, fullPathHash))
+        {
+            playableHash = fullPathHash;
+        }
+
+        if (playableHash == 0)
+        {
+            return false;
+        }
+
+        if (currentAnimationHash != playableHash)
+        {
+            animator.Play(playableHash);
+            currentAnimationHash = playableHash;
+        }
+
+        return true;
+    }
+
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, interactRange);
+        Gizmos.DrawWireSphere(GetInteractionCenter(), interactRange);
     }
 }

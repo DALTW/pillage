@@ -6,6 +6,7 @@ public class PencilFragmentHud : MonoBehaviour
 {
     private static PencilFragmentHud instance;
     private static Sprite iconSprite;
+    private static Sprite usedIconSprite;
     private static Sprite greenCrayonIconSprite;
 
     private const float IconStartX = 18f;
@@ -19,6 +20,12 @@ public class PencilFragmentHud : MonoBehaviour
     {
         PencilFragmentHud hud = GetOrCreate();
         hud.gameObject.SetActive(true);
+        hud.RefreshIcons();
+    }
+
+    public static void RefreshCollected()
+    {
+        PencilFragmentHud hud = instance != null ? instance : GetOrCreate();
         hud.RefreshIcons();
     }
 
@@ -65,9 +72,10 @@ public class PencilFragmentHud : MonoBehaviour
 
         HideChildrenWithPrefix("GeneratedPencilFragmentHudIcon_");
 
-        int count = GameProgress.AvailablePencilFragmentCount;
+        int collectedCount = GameProgress.CollectedPencilFragmentCount;
+        int availableCount = GameProgress.AvailablePencilFragmentCount;
 
-        while (iconObjects.Count < count)
+        while (iconObjects.Count < collectedCount)
         {
             iconObjects.Add(CreateIconObject(iconObjects.Count));
         }
@@ -80,12 +88,19 @@ public class PencilFragmentHud : MonoBehaviour
                 continue;
             }
 
-            bool shouldShow = i < count;
+            bool shouldShow = i < collectedCount;
             iconObject.SetActive(shouldShow);
 
             if (!shouldShow)
             {
                 continue;
+            }
+
+            Image image = iconObject.GetComponent<Image>();
+            if (image != null)
+            {
+                image.sprite = i < availableCount ? GetIconSprite() : GetUsedIconSprite();
+                image.color = Color.white;
             }
 
             RectTransform rectTransform = iconObject.GetComponent<RectTransform>();
@@ -95,9 +110,9 @@ public class PencilFragmentHud : MonoBehaviour
             }
         }
 
-        bool hasGreenCrayonIcon = RefreshGreenCrayonIcon(count);
+        bool hasGreenCrayonIcon = RefreshGreenCrayonIcon(collectedCount);
 
-        if (count <= 0 && !hasGreenCrayonIcon)
+        if (collectedCount <= 0 && !hasGreenCrayonIcon)
         {
             gameObject.SetActive(false);
         }
@@ -137,7 +152,8 @@ public class PencilFragmentHud : MonoBehaviour
 
     private bool RefreshGreenCrayonIcon(int pencilIconCount)
     {
-        if (!GameProgress.HasCollectedGreenCrayon)
+        bool shouldShow = GameProgress.HasCollectedGreenCrayon || GameProgress.HasUsedGreenCrayon;
+        if (!shouldShow)
         {
             if (greenCrayonIconObject != null)
             {
@@ -153,6 +169,13 @@ public class PencilFragmentHud : MonoBehaviour
         }
 
         greenCrayonIconObject.SetActive(true);
+
+        Image image = greenCrayonIconObject.GetComponent<Image>();
+        if (image != null)
+        {
+            image.sprite = GetGreenCrayonIconSprite();
+            image.color = Color.white;
+        }
 
         RectTransform rectTransform = greenCrayonIconObject.GetComponent<RectTransform>();
         if (rectTransform != null)
@@ -235,6 +258,48 @@ public class PencilFragmentHud : MonoBehaviour
         iconSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
         iconSprite.name = "GeneratedPencilFragmentHudSprite";
         return iconSprite;
+    }
+
+    private static Sprite GetUsedIconSprite()
+    {
+        if (usedIconSprite != null)
+        {
+            return usedIconSprite;
+        }
+
+        const int width = 96;
+        const int height = 44;
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        texture.filterMode = FilterMode.Point;
+
+        Color clear = new Color(0f, 0f, 0f, 0f);
+        Color outline = new Color32(60, 58, 55, 255);
+        Color body = new Color32(166, 166, 158, 255);
+        Color wood = new Color32(145, 140, 132, 255);
+        Color lead = new Color32(64, 62, 58, 255);
+        Color edge = new Color32(116, 112, 105, 255);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                texture.SetPixel(x, y, clear);
+            }
+        }
+
+        FillRect(texture, 8, 14, 58, 15, outline);
+        FillRect(texture, 10, 16, 54, 11, body);
+        FillRect(texture, 64, 14, 15, 15, outline);
+        FillRect(texture, 64, 16, 12, 11, wood);
+        FillRect(texture, 76, 17, 9, 9, outline);
+        FillRect(texture, 76, 19, 6, 5, lead);
+        FillRect(texture, 5, 13, 9, 17, outline);
+        FillRect(texture, 7, 15, 5, 13, edge);
+
+        texture.Apply();
+        usedIconSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+        usedIconSprite.name = "GeneratedUsedPencilFragmentHudSprite";
+        return usedIconSprite;
     }
 
     private static Sprite GetGreenCrayonIconSprite()

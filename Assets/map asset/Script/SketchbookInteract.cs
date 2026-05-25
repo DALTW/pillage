@@ -221,7 +221,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
     private void CompleteForestExpansionDrawing()
     {
         GameProgress.CompleteSketchbookForestDrawing();
-        PencilFragmentHud.ShowCollected();
+        PencilFragmentHud.RefreshCollected();
         SketchOutsideTransition.ApplySketchbookForestUnlock();
         UnlockPlayerAfterFirstDrawing();
     }
@@ -229,7 +229,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
     private void CompleteVillageGreenColoring()
     {
         GameProgress.ColorVillageGreen();
-        PencilFragmentHud.ShowCollected();
+        PencilFragmentHud.RefreshCollected();
         SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
         UnlockPlayerAfterFirstDrawing();
     }

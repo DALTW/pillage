@@ -43,17 +43,20 @@ public static class GameProgress
     public static int UsedLetterFragmentCount { get; private set; }
     public static bool HasRevealedGreenCrayon { get; private set; }
     public static bool HasCollectedGreenCrayon { get; private set; }
+    public static bool HasUsedGreenCrayon { get; private set; }
     public static bool HasExtendedSketchbookPencil { get; private set; }
     public static bool HasDrawnForestSketch { get; private set; }
     public static bool HasColoredVillageGreen { get; private set; }
+    public static bool HasColoredForestGreen { get; private set; }
 
     public static bool HasCompletedLetter => AvailableLetterFragmentCount >= RequiredLetterFragmentCount;
     public static bool CanCatchLetterBottle => HasMetQuestNpc && !HasCollectedBottleLetterFragment;
     public static bool CanFindFinalGrassLetterFragment => HasCollectedTreeLetterFragment && !HasCollectedGrassLetterFragment;
-    public static bool CanAddFishingRodInsect => FishingRodInsectCount < RequiredFishingRodInsectCount && !HasRevealedGreenCrayon && !HasCollectedGreenCrayon;
-    public static bool CanRevealGreenCrayon => FishingRodInsectCount >= RequiredFishingRodInsectCount && !HasRevealedGreenCrayon && !HasCollectedGreenCrayon;
+    public static bool HasUncoloredGreenTarget => !HasColoredVillageGreen || (HasDrawnForestSketch && !HasColoredForestGreen);
+    public static bool CanAddFishingRodInsect => HasUncoloredGreenTarget && FishingRodInsectCount < RequiredFishingRodInsectCount && !HasRevealedGreenCrayon && !HasCollectedGreenCrayon;
+    public static bool CanRevealGreenCrayon => HasUncoloredGreenTarget && FishingRodInsectCount >= RequiredFishingRodInsectCount && !HasRevealedGreenCrayon && !HasCollectedGreenCrayon;
     public static bool CanExtendPencilAtSketchbook => AvailablePencilFragmentCount >= 3 && !HasExtendedSketchbookPencil;
-    public static bool CanColorVillageAtSketchbook => HasCollectedGreenCrayon;
+    public static bool CanColorVillageAtSketchbook => HasCollectedGreenCrayon && HasUncoloredGreenTarget;
 
     public static int CollectedPencilFragmentCount
     {
@@ -118,9 +121,11 @@ public static class GameProgress
         UsedLetterFragmentCount = 0;
         HasRevealedGreenCrayon = false;
         HasCollectedGreenCrayon = false;
+        HasUsedGreenCrayon = false;
         HasExtendedSketchbookPencil = false;
         HasDrawnForestSketch = false;
         HasColoredVillageGreen = false;
+        HasColoredForestGreen = false;
     }
 
     public static void CheckSketchbook()
@@ -342,6 +347,7 @@ public static class GameProgress
         UsedPencilFragmentCount = Mathf.Min(CollectedPencilFragmentCount, UsedPencilFragmentCount + 3);
         HasExtendedSketchbookPencil = true;
         HasDrawnForestSketch = true;
+        HasColoredForestGreen = HasColoredForestGreen || HasColoredVillageGreen;
     }
 
     public static void ColorVillageGreen()
@@ -354,6 +360,11 @@ public static class GameProgress
         HasCollectedGreenCrayon = false;
         HasRevealedGreenCrayon = false;
         FishingRodInsectCount = 0;
+        HasUsedGreenCrayon = true;
         HasColoredVillageGreen = true;
+        if (HasDrawnForestSketch)
+        {
+            HasColoredForestGreen = true;
+        }
     }
 }
