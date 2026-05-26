@@ -7,7 +7,7 @@ public class PineTreeShakeInteract : MonoBehaviour, IInteractable
     [SerializeField] private float promptDistance = 2.15f;
     [SerializeField] private float shakeDuration = 0.72f;
     [SerializeField] private float maxShakeAngle = 11f;
-    [SerializeField, Range(0f, 1f)] private float pencilFragmentChance = 0.1f;
+    [SerializeField, Range(0f, 1f)] private float pencilFragmentChance = 0.4f;
 
     private const float DropLineWidth = 0.045f;
     private const int DropSortingOrder = 68;

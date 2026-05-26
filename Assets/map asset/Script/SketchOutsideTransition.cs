@@ -29,22 +29,39 @@ public class SketchOutsideTransition : MonoBehaviour
     private const float MailboxHouseThirdScale = 0.52f;
     private const float DecorationOverlapPadding = 0.28f;
     private const float QuestNpcPromptDistance = 2.3f;
+    private const float ForestBirdPromptDistance = 2.15f;
+    private const float ForestWellPromptDistance = 1.9f;
+    private const float MoleHolePromptDistance = 1.45f;
     private const float QuestNpcPromptPulseSpeed = 4.4f;
     private const float PathRevealDistance = 7.2f;
     private const float PathDecorationClearance = 1.15f;
     private const float ForestGateHalfHeight = 3.2f;
-    private const int ForestExtensionTreeCount = 42;
+    private const int ForestExtensionTreeCount = 64;
+    private const int DeepForestExtensionTreeCount = 58;
+    private const int ForestBranchTreePlacementIndex = 7;
     private const float LetterFragmentRevealDistance = 5.7f;
     private const float LetterFragmentPromptDistance = 1.45f;
+    private const float ForestBranchTreePromptDistance = 2.1f;
+    private const float ForestRockPromptDistance = 1.65f;
     private const int LetterFragmentSortingOrder = PropSortingOrder + 6;
     private const int LetterFragmentPromptSortingOrder = PropSortingOrder + 52;
     private const int QuestGuideSortingOrder = PropSortingOrder + 7;
+    private const int ForestWellSortingOrder = TreeSortingOrder + 1;
+    private const int ForestBirdSortingOrder = TreeSortingOrder + 4;
+    private const int MoleHoleSortingOrder = PropSortingOrder + 2;
+    private const int ForestBranchPromptSortingOrder = TreeSortingOrder + 48;
+    private const int MoleHolePromptSortingOrder = MoleHoleSortingOrder + 48;
+    private const int MoleSortingOrder = ForestBirdSortingOrder + 1;
+    private const int ForestBirdPromptSortingOrder = ForestBirdSortingOrder + 45;
+    private const int ForestWellPromptSortingOrder = ForestWellSortingOrder + 45;
+    private const int ForestRockPromptSortingOrder = PropSortingOrder + 50;
     private const string QuestNpcSearchingPrompt = "[\uD3B8\uC9C0]+[?]";
     private const string QuestNpcCompletePrompt = "[\uD3B8\uC9C0]+[!]";
     private const string GrassResourcePath = "Outside/grass_thick";
     private const string MailboxResourcePath = "Outside/mailbox_thick";
     private static readonly Color VillageGreenColor = new Color32(69, 158, 72, 255);
     private static readonly Color VillageGrassLightGreenColor = new Color32(151, 214, 83, 255);
+    private static readonly Color BrownCrayonColor = new Color32(139, 82, 39, 232);
     private static readonly Dictionary<Sprite, Sprite> GrassColorOverlaySpriteCache = new Dictionary<Sprite, Sprite>();
     private static readonly Vector2 GrassScaleRange = new Vector2(0.5508f, 0.8424f);
     private static readonly Vector2 TreeScaleRange = new Vector2(1.12f, 1.32f);
@@ -61,6 +78,28 @@ public class SketchOutsideTransition : MonoBehaviour
     private static readonly Vector3 MapSlideStartOffset = new Vector3(0f, -1.4f, 0f);
     private static readonly Vector2 BackgroundSize = new Vector2(70f, 48f);
     private static readonly Vector3 ForestRegionOffset = new Vector3(BackgroundSize.x, 0f, 0f);
+    private static readonly Vector3 DeepForestRegionOffset = new Vector3(BackgroundSize.x * 2f, 0f, 0f);
+    private static readonly Vector3 ForestSmallBirdOffset = ForestRegionOffset + new Vector3(0f, 0f, 0f);
+    private static readonly Vector3 ForestFallenBirdOffset = ForestRegionOffset + new Vector3(-27.8f, -17.6f, 0f);
+    private static readonly Vector3 ForestWellOffset = ForestRegionOffset + new Vector3(10.6f, -7.8f, 0f);
+    private static readonly Vector3 MoleRewardOffset = ForestRegionOffset + new Vector3(-7.2f, 8.8f, 0f);
+    private static readonly Vector3[] ForestRockOffsets =
+    {
+        ForestRegionOffset + new Vector3(-30.4f, 3.8f, 0f),
+        ForestRegionOffset + new Vector3(-22.8f, -16.4f, 0f),
+        ForestRegionOffset + new Vector3(-4.8f, 14.2f, 0f),
+        ForestRegionOffset + new Vector3(13.4f, 7.8f, 0f),
+        ForestRegionOffset + new Vector3(24.8f, -14.6f, 0f)
+    };
+    private const int ForestRewardRockIndex = 3;
+    private static readonly Vector3[] ForestMoleHoleOffsets =
+    {
+        ForestRegionOffset + new Vector3(-18.4f, 12.4f, 0f),
+        ForestRegionOffset + new Vector3(-7.2f, 8.8f, 0f),
+        ForestRegionOffset + new Vector3(7.6f, 12.0f, 0f),
+        ForestRegionOffset + new Vector3(17.8f, -5.4f, 0f),
+        ForestRegionOffset + new Vector3(-16.2f, -10.4f, 0f)
+    };
     private static readonly Vector2 DecorationMin = new Vector2(-33f, -21f);
     private static readonly Vector2 DecorationMax = new Vector2(33f, 21f);
     private static readonly Vector3[][] OutsidePathCenterLines =
@@ -116,6 +155,7 @@ public class SketchOutsideTransition : MonoBehaviour
     private SketchOutsideDoorInteract houseDoorInteract;
     private BoxCollider2D houseDoorCollider;
     private BoxCollider2D villageRightBoundaryCollider;
+    private BoxCollider2D forestRightBoundaryCollider;
     private readonly List<MapRevealItem> mapRevealItems = new List<MapRevealItem>();
     private Transform boundaryRoot;
     private Transform outsidePlayer;
@@ -125,7 +165,9 @@ public class SketchOutsideTransition : MonoBehaviour
     private bool hasCompletedOutsideMap;
     private bool isOutsideActive;
     private bool hasCreatedForestExtension;
+    private bool hasCreatedDeepForestExtension;
     private bool hasCreatedVillageForestGateColliders;
+    private bool hasCreatedForestDeepGateColliders;
     private bool hasAppliedVillageGreenColoring;
 
     private sealed class MapRevealItem
@@ -235,11 +277,25 @@ public class SketchOutsideTransition : MonoBehaviour
         transition.EnsureForestExtensionCreated();
     }
 
+    public static void ApplySketchbookDeepForestUnlock()
+    {
+        SketchOutsideTransition transition = GetOrCreateInstance();
+        transition.EnsureSetup();
+        transition.RemoveDeepForestExtension();
+    }
+
     public static void ApplySketchbookVillageGreenColoring()
     {
         SketchOutsideTransition transition = GetOrCreateInstance();
         transition.EnsureSetup();
         transition.EnsureVillageGreenColoringApplied();
+    }
+
+    public static void ApplySketchbookBrownColoring()
+    {
+        SketchOutsideTransition transition = GetOrCreateInstance();
+        transition.EnsureSetup();
+        transition.EnsureBrownColoringApplied();
     }
 
     public void EnterWoodhouse(GameObject player, Vector3 interiorEntryPosition)
@@ -708,7 +764,9 @@ public class SketchOutsideTransition : MonoBehaviour
         if (contentRoot != null)
         {
             EnsureForestExtensionCreated();
+            RemoveDeepForestExtension();
             EnsureVillageGreenColoringApplied();
+            EnsureBrownColoringApplied();
             return;
         }
 
@@ -720,8 +778,74 @@ public class SketchOutsideTransition : MonoBehaviour
         houseDoorInteract = CreateHouseDoor();
         CreateOutsideProps();
         EnsureForestExtensionCreated();
+        RemoveDeepForestExtension();
         EnsureVillageGreenColoringApplied();
+        EnsureBrownColoringApplied();
         contentRoot.SetActive(false);
+    }
+
+    private void RemoveDeepForestExtension()
+    {
+        DestroyGeneratedChildrenWithPrefix(propRoot != null ? propRoot.transform : null, "GeneratedDeepForest");
+        DestroyGeneratedChildrenWithPrefix(propRoot != null ? propRoot.transform : null, "GeneratedGrassDeepForest");
+        DestroyGeneratedChildrenWithPrefix(boundaryRoot, "GeneratedDeepForest");
+        DestroyGeneratedChildrenWithPrefix(boundaryRoot, "GeneratedForestDeepBoundary");
+
+        hasCreatedDeepForestExtension = false;
+        hasCreatedForestDeepGateColliders = false;
+
+        if (forestRightBoundaryCollider != null)
+        {
+            forestRightBoundaryCollider.enabled = true;
+        }
+
+        Transform forestFenceTransform = propRoot != null
+            ? propRoot.transform.Find("GeneratedForestExtensionFence")
+            : null;
+        SketchWorldLineDrawing forestFenceDrawing = forestFenceTransform != null
+            ? forestFenceTransform.GetComponent<SketchWorldLineDrawing>()
+            : null;
+        if (forestFenceDrawing != null)
+        {
+            forestFenceDrawing.SetStrokes(BuildForestExtensionBoundaryStrokes());
+        }
+
+        Transform forestFenceBrownTransform = propRoot != null
+            ? propRoot.transform.Find("GeneratedForestExtensionFence_BrownOverlay")
+            : null;
+        SketchWorldLineDrawing forestFenceBrownDrawing = forestFenceBrownTransform != null
+            ? forestFenceBrownTransform.GetComponent<SketchWorldLineDrawing>()
+            : null;
+        if (forestFenceBrownDrawing != null)
+        {
+            forestFenceBrownDrawing.SetStrokes(BuildForestExtensionBoundaryStrokes());
+        }
+    }
+
+    private static void DestroyGeneratedChildrenWithPrefix(Transform parent, string namePrefix)
+    {
+        if (parent == null)
+        {
+            return;
+        }
+
+        for (int i = parent.childCount - 1; i >= 0; i--)
+        {
+            Transform child = parent.GetChild(i);
+            if (child == null || !child.name.StartsWith(namePrefix))
+            {
+                continue;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(child.gameObject);
+            }
+            else
+            {
+                DestroyImmediate(child.gameObject);
+            }
+        }
     }
 
     private SpriteRenderer CreateBackground()
@@ -829,7 +953,59 @@ public class SketchOutsideTransition : MonoBehaviour
         CreateVillageForestGateColliders();
         CreateForestExtensionBoundary();
         CreateForestExtensionPath();
+        CreateForestExtensionQuestObjects();
         CreateForestExtensionDecorations();
+        EnsureBrownColoringApplied();
+    }
+
+    private void EnsureDeepForestExtensionCreated()
+    {
+        if (!GameProgress.HasDrawnDeepForestSketch || hasCreatedDeepForestExtension || propRoot == null)
+        {
+            return;
+        }
+
+        hasCreatedDeepForestExtension = true;
+
+        if (backgroundRenderer != null)
+        {
+            backgroundRenderer.transform.localPosition = GetBackgroundLocalPosition();
+
+            if (hasCompletedOutsideMap)
+            {
+                backgroundRenderer.transform.localScale = GetBackgroundFinalScale();
+            }
+        }
+
+        if (forestRightBoundaryCollider != null)
+        {
+            forestRightBoundaryCollider.enabled = false;
+        }
+
+        Transform forestFenceTransform = propRoot.transform.Find("GeneratedForestExtensionFence");
+        SketchWorldLineDrawing forestFenceDrawing = forestFenceTransform != null
+            ? forestFenceTransform.GetComponent<SketchWorldLineDrawing>()
+            : null;
+        if (forestFenceDrawing != null)
+        {
+            forestFenceDrawing.SetStrokes(BuildForestExtensionBoundaryWithDeepGateStrokes());
+        }
+
+        Transform forestFenceBrownTransform = propRoot.transform.Find("GeneratedForestExtensionFence_BrownOverlay");
+        SketchWorldLineDrawing forestFenceBrownDrawing = forestFenceBrownTransform != null
+            ? forestFenceBrownTransform.GetComponent<SketchWorldLineDrawing>()
+            : null;
+        if (forestFenceBrownDrawing != null)
+        {
+            forestFenceBrownDrawing.SetStrokes(BuildForestExtensionBoundaryWithDeepGateStrokes());
+        }
+
+        CreateForestDeepGateColliders();
+        CreateDeepForestExtensionBoundary();
+        CreateDeepForestExtensionPath();
+        CreateDeepForestExtensionDecorations();
+        EnsureVillageGreenColoringApplied();
+        EnsureBrownColoringApplied();
     }
 
     private void CreateVillageForestGateColliders()
@@ -859,6 +1035,33 @@ public class SketchOutsideTransition : MonoBehaviour
             new Vector2(thickness, segmentHeight));
     }
 
+    private void CreateForestDeepGateColliders()
+    {
+        if (hasCreatedForestDeepGateColliders || boundaryRoot == null)
+        {
+            return;
+        }
+
+        hasCreatedForestDeepGateColliders = true;
+
+        float halfWidth = BackgroundSize.x * 0.5f;
+        float halfHeight = BackgroundSize.y * 0.5f;
+        float thickness = BoundaryColliderThickness;
+        float colliderX = ForestRegionOffset.x + halfWidth + thickness * 0.5f;
+        float segmentHeight = Mathf.Max(0.1f, halfHeight - ForestGateHalfHeight + thickness);
+
+        CreateBoundaryCollider(
+            "GeneratedForestDeepBoundary_GateTop",
+            boundaryRoot,
+            new Vector2(colliderX, (ForestGateHalfHeight + halfHeight) * 0.5f),
+            new Vector2(thickness, segmentHeight));
+        CreateBoundaryCollider(
+            "GeneratedForestDeepBoundary_GateBottom",
+            boundaryRoot,
+            new Vector2(colliderX, (-ForestGateHalfHeight - halfHeight) * 0.5f),
+            new Vector2(thickness, segmentHeight));
+    }
+
     private void CreateForestExtensionBoundary()
     {
         if (boundaryRoot == null)
@@ -881,7 +1084,7 @@ public class SketchOutsideTransition : MonoBehaviour
         float thickness = BoundaryColliderThickness;
         float centerX = ForestRegionOffset.x;
 
-        CreateBoundaryCollider(
+        forestRightBoundaryCollider = CreateBoundaryCollider(
             "GeneratedForestExtensionBoundary_Right",
             boundaryRoot,
             new Vector2(centerX + halfWidth + thickness * 0.5f, 0f),
@@ -913,22 +1116,205 @@ public class SketchOutsideTransition : MonoBehaviour
         RegisterLineReveal(pathDrawing, PathRevealDistance, centerLine);
     }
 
+    private void CreateDeepForestExtensionBoundary()
+    {
+        if (boundaryRoot == null)
+        {
+            return;
+        }
+
+        Color fenceColor = new Color32(76, 55, 35, 255);
+        SketchWorldLineDrawing deepForestFence = CreateLineDrawing(
+            "GeneratedDeepForestExtensionFence",
+            DeepForestRegionOffset,
+            BuildForestExtensionBoundaryStrokes(),
+            PropSortingOrder + 3,
+            propRoot.transform,
+            fenceColor);
+        RegisterLineReveal(deepForestFence, FenceRevealDistance, BuildDeepForestExtensionBoundaryRevealPoints());
+
+        float halfWidth = BackgroundSize.x * 0.5f;
+        float halfHeight = BackgroundSize.y * 0.5f;
+        float thickness = BoundaryColliderThickness;
+        float centerX = DeepForestRegionOffset.x;
+
+        CreateBoundaryCollider(
+            "GeneratedDeepForestExtensionBoundary_Right",
+            boundaryRoot,
+            new Vector2(centerX + halfWidth + thickness * 0.5f, 0f),
+            new Vector2(thickness, BackgroundSize.y + thickness * 2f));
+        CreateBoundaryCollider(
+            "GeneratedDeepForestExtensionBoundary_Top",
+            boundaryRoot,
+            new Vector2(centerX, halfHeight + thickness * 0.5f),
+            new Vector2(BackgroundSize.x + thickness * 2f, thickness));
+        CreateBoundaryCollider(
+            "GeneratedDeepForestExtensionBoundary_Bottom",
+            boundaryRoot,
+            new Vector2(centerX, -halfHeight - thickness * 0.5f),
+            new Vector2(BackgroundSize.x + thickness * 2f, thickness));
+    }
+
+    private void CreateDeepForestExtensionPath()
+    {
+        Vector3[] centerLine = BuildDeepForestExtensionPathCenterLine();
+        Color pathColor = new Color32(132, 98, 61, 175);
+        SketchWorldLineDrawing pathDrawing = CreateLineDrawing(
+            "GeneratedDeepForestExtensionPath",
+            Vector3.zero,
+            BuildOutsidePathStrokes(centerLine),
+            PathSortingOrder,
+            propRoot.transform,
+            pathColor);
+        pathDrawing.Configure(HouseLineWidth * 1.28f, pathColor, PathSortingOrder);
+        RegisterLineReveal(pathDrawing, PathRevealDistance, centerLine);
+    }
+
+    private void CreateForestExtensionQuestObjects()
+    {
+        CreateForestWell();
+        CreateForestSmallBird();
+        CreateForestFallenBird();
+        CreateForestRocks();
+        CreateMoleHoles();
+    }
+
+    private void CreateForestWell()
+    {
+        SketchWorldLineDrawing wellDrawing = CreateLineDrawing(
+            "GeneratedForestWellLineDrawing",
+            ForestWellOffset,
+            BuildForestWellStrokes(),
+            ForestWellSortingOrder,
+            propRoot.transform,
+            new Color32(62, 55, 48, 255));
+        wellDrawing.Configure(HouseLineWidth * 1.05f, new Color32(62, 55, 48, 255), ForestWellSortingOrder);
+
+        ForestWellBottleInteract wellInteract = wellDrawing.gameObject.AddComponent<ForestWellBottleInteract>();
+        wellInteract.Configure(ForestWellPromptDistance, ForestWellPromptSortingOrder);
+        wellInteract.enabled = false;
+
+        RegisterLineReveal(wellDrawing, wellInteract, ForestWellOffset);
+        CreatePropGroundStroke("GeneratedForestWell", ForestWellOffset, 1.55f, ForestWellSortingOrder - 1, propRoot.transform);
+        CreateForestWellCollider();
+    }
+
+    private void CreateForestWellCollider()
+    {
+        Transform colliderParent = boundaryRoot != null ? boundaryRoot : propRoot.transform;
+        GameObject colliderObject = new GameObject("GeneratedForestWellCollider");
+        colliderObject.transform.SetParent(colliderParent, false);
+        colliderObject.transform.localPosition = ForestWellOffset + new Vector3(0f, -0.34f, 0f);
+
+        BoxCollider2D collider = colliderObject.AddComponent<BoxCollider2D>();
+        collider.size = new Vector2(2.75f, 1.38f);
+        collider.isTrigger = false;
+    }
+
+    private void CreateForestSmallBird()
+    {
+        SketchWorldLineDrawing birdDrawing = CreateLineDrawing(
+            "GeneratedForestSmallBirdLineDrawing",
+            ForestSmallBirdOffset,
+            BuildSmallBirdStrokes(),
+            ForestBirdSortingOrder,
+            propRoot.transform,
+            new Color32(42, 37, 31, 255));
+        birdDrawing.Configure(HouseLineWidth * 0.92f, new Color32(42, 37, 31, 255), ForestBirdSortingOrder);
+
+        ForestBirdQuestInteract birdInteract = birdDrawing.gameObject.AddComponent<ForestBirdQuestInteract>();
+        birdInteract.Configure(ForestBirdPromptDistance, ForestBirdPromptSortingOrder);
+        birdInteract.enabled = false;
+
+        RegisterLineReveal(birdDrawing, birdInteract, ForestSmallBirdOffset);
+        CreatePropGroundStroke("GeneratedForestSmallBird", ForestSmallBirdOffset, 0.82f, ForestBirdSortingOrder - 1, propRoot.transform);
+    }
+
+    private void CreateForestFallenBird()
+    {
+        SketchWorldLineDrawing birdDrawing = CreateLineDrawing(
+            "GeneratedForestFallenBirdLineDrawing",
+            ForestFallenBirdOffset,
+            BuildFallenBirdStrokes(),
+            ForestBirdSortingOrder,
+            propRoot.transform,
+            new Color32(42, 37, 31, 255));
+        birdDrawing.Configure(HouseLineWidth * 0.92f, new Color32(42, 37, 31, 255), ForestBirdSortingOrder);
+
+        ForestFallenBirdInteract birdInteract = birdDrawing.gameObject.AddComponent<ForestFallenBirdInteract>();
+        birdInteract.Configure(ForestBirdPromptDistance, ForestBirdPromptSortingOrder);
+        birdInteract.enabled = false;
+
+        RegisterLineReveal(birdDrawing, birdInteract, ForestFallenBirdOffset);
+        CreatePropGroundStroke("GeneratedForestFallenBird", ForestFallenBirdOffset, 0.94f, ForestBirdSortingOrder - 1, propRoot.transform);
+    }
+
+    private void CreateMoleHoles()
+    {
+        for (int i = 0; i < ForestMoleHoleOffsets.Length; i++)
+        {
+            Vector3 holePosition = ForestMoleHoleOffsets[i];
+            SketchWorldLineDrawing holeDrawing = CreateLineDrawing(
+                $"GeneratedMoleHole_{i:00}",
+                holePosition,
+                BuildMoleHoleStrokes(),
+                MoleHoleSortingOrder,
+                propRoot.transform,
+                new Color32(68, 47, 32, 255));
+            holeDrawing.Configure(HouseLineWidth * 0.82f, new Color32(68, 47, 32, 255), MoleHoleSortingOrder);
+
+            MoleHoleInteract holeInteract = holeDrawing.gameObject.AddComponent<MoleHoleInteract>();
+            holeInteract.Configure(i, MoleHolePromptDistance, MoleHolePromptSortingOrder, propRoot.transform);
+            holeInteract.enabled = false;
+
+            RegisterLineReveal(holeDrawing, holeInteract, holePosition);
+        }
+    }
+
+    private void CreateForestRocks()
+    {
+        for (int i = 0; i < ForestRockOffsets.Length; i++)
+        {
+            Vector3 rockPosition = ForestRockOffsets[i];
+            bool hasReward = i == ForestRewardRockIndex;
+            float scale = hasReward ? 1.08f : 0.92f + 0.08f * (i % 3);
+            SketchWorldLineDrawing rockDrawing = CreateLineDrawing(
+                $"GeneratedForestRock_{i:00}",
+                rockPosition,
+                BuildForestRockStrokes(scale),
+                PropSortingOrder + 2,
+                propRoot.transform,
+                new Color32(74, 66, 58, 255));
+            rockDrawing.Configure(HouseLineWidth * 0.9f, new Color32(74, 66, 58, 255), PropSortingOrder + 2);
+
+            ForestRockCrackInteract rockInteract = rockDrawing.gameObject.AddComponent<ForestRockCrackInteract>();
+            rockInteract.Configure(hasReward, ForestRockPromptDistance, ForestRockPromptSortingOrder);
+            rockInteract.enabled = false;
+
+            RegisterLineReveal(rockDrawing, rockInteract, rockPosition);
+            CreatePropGroundStroke($"GeneratedForestRock_{i:00}", rockPosition, 1.2f * scale, PropSortingOrder + 1, propRoot.transform);
+        }
+    }
+
     private void CreateForestExtensionDecorations()
     {
         System.Random random = new System.Random(DecorationRandomSeed + 37);
         List<DecorationFootprint> usedFootprints = new List<DecorationFootprint>();
+        int placedTreeCount = 0;
+        bool hasCreatedBranchTree = false;
 
         for (int i = 0; i < ForestExtensionTreeCount; i++)
         {
             float scale = RandomRange(random, TreeScaleRange.x, TreeScaleRange.y);
             Vector2 halfSize = GetPineDecorationHalfSize(scale);
 
-            if (!TryPickForestTreePosition(random, usedFootprints, halfSize, 5.2f, out Vector2 position))
+            if (!TryPickForestTreePosition(random, usedFootprints, halfSize, 4.4f, out Vector2 position))
             {
                 continue;
             }
 
             Vector3 localPosition = new Vector3(position.x, position.y, 0f);
+            bool isBranchTree = !hasCreatedBranchTree && placedTreeCount >= ForestBranchTreePlacementIndex;
             SketchWorldLineDrawing pineTree = CreateLineDrawing(
                 $"GeneratedForestExtensionPine_{i:00}",
                 localPosition,
@@ -937,7 +1323,20 @@ public class SketchOutsideTransition : MonoBehaviour
                 propRoot.transform);
             TreeCrayonColorTarget colorTarget = pineTree.gameObject.AddComponent<TreeCrayonColorTarget>();
             colorTarget.Configure(scale);
-            RegisterLineReveal(pineTree, localPosition);
+
+            if (isBranchTree)
+            {
+                ForestBranchTreeInteract branchInteract = pineTree.gameObject.AddComponent<ForestBranchTreeInteract>();
+                branchInteract.Configure(scale, ForestBranchTreePromptDistance, ForestBranchPromptSortingOrder);
+                branchInteract.enabled = false;
+                RegisterLineReveal(pineTree, branchInteract, localPosition);
+                hasCreatedBranchTree = true;
+            }
+            else
+            {
+                RegisterLineReveal(pineTree, localPosition);
+            }
+
             CreatePropGroundStroke($"GeneratedForestExtensionPine_{i:00}", localPosition, 1.16f * scale, TreeSortingOrder - 1, propRoot.transform);
 
             if (GameProgress.HasColoredVillageGreen)
@@ -945,7 +1344,94 @@ public class SketchOutsideTransition : MonoBehaviour
                 CreateTreeLeafOverlay(colorTarget, pineTree, TreeSortingOrder + 2);
             }
 
+            if (GameProgress.HasColoredBrownDetails)
+            {
+                CreateTreeTrunkOverlay(colorTarget, pineTree, TreeSortingOrder + 3);
+            }
+
             usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
+            placedTreeCount++;
+        }
+    }
+
+    private void CreateDeepForestExtensionDecorations()
+    {
+        System.Random random = new System.Random(DecorationRandomSeed + 79);
+        List<DecorationFootprint> usedFootprints = new List<DecorationFootprint>();
+        int placedTreeCount = 0;
+
+        for (int i = 0; i < DeepForestExtensionTreeCount; i++)
+        {
+            float scale = RandomRange(random, TreeScaleRange.x, TreeScaleRange.y);
+            Vector2 halfSize = GetPineDecorationHalfSize(scale);
+
+            if (!TryPickDeepForestTreePosition(random, usedFootprints, halfSize, 4.4f, out Vector2 position))
+            {
+                continue;
+            }
+
+            Vector3 localPosition = new Vector3(position.x, position.y, 0f);
+            SketchWorldLineDrawing pineTree = CreateLineDrawing(
+                $"GeneratedDeepForestExtensionPine_{i:00}",
+                localPosition,
+                BuildPineTreeStrokes(scale),
+                TreeSortingOrder,
+                propRoot.transform);
+            TreeCrayonColorTarget colorTarget = pineTree.gameObject.AddComponent<TreeCrayonColorTarget>();
+            colorTarget.Configure(scale);
+            RegisterLineReveal(pineTree, localPosition);
+            CreatePropGroundStroke($"GeneratedDeepForestExtensionPine_{i:00}", localPosition, 1.16f * scale, TreeSortingOrder - 1, propRoot.transform);
+
+            if (GameProgress.HasColoredVillageGreen)
+            {
+                CreateTreeLeafOverlay(colorTarget, pineTree, TreeSortingOrder + 2);
+            }
+
+            if (GameProgress.HasColoredBrownDetails)
+            {
+                CreateTreeTrunkOverlay(colorTarget, pineTree, TreeSortingOrder + 3);
+            }
+
+            usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
+            placedTreeCount++;
+        }
+
+        CreateDeepForestGrassDecorations(random, usedFootprints, placedTreeCount);
+    }
+
+    private void CreateDeepForestGrassDecorations(System.Random random, List<DecorationFootprint> usedFootprints, int treeCountSeed)
+    {
+        Sprite sprite = LoadSketchSprite(GrassResourcePath);
+        if (sprite == null)
+        {
+            return;
+        }
+
+        int grassCount = Mathf.Clamp(treeCountSeed * 3, 90, 150);
+        for (int i = 0; i < grassCount; i++)
+        {
+            float scale = RandomRange(random, GrassScaleRange.x, GrassScaleRange.y);
+            float scaleX = random.NextDouble() < 0.5d ? -scale : scale;
+            Vector3 localScale = new Vector3(scaleX, scale, 1f);
+            Vector2 halfSize = GetDecorationHalfSize(sprite, localScale);
+
+            if (!TryPickDeepForestDecorationPosition(random, usedFootprints, halfSize, 2.1f, out Vector2 position))
+            {
+                continue;
+            }
+
+            Transform grassTransform = CreateSpriteProp(
+                $"GeneratedGrassDeepForest_{i:00}",
+                sprite,
+                new Vector3(position.x, position.y, 0f),
+                localScale,
+                GrassSortingOrder,
+                propRoot.transform);
+
+            if (grassTransform != null)
+            {
+                usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
+            }
         }
     }
 
@@ -1004,12 +1490,130 @@ public class SketchOutsideTransition : MonoBehaviour
     {
         return IsInsideBox(position, ForestRegionOffset + new Vector3(-33f, 0f, 0f), new Vector2(5.2f, 4.6f))
             || IsInsideBox(position, ForestRegionOffset + new Vector3(4.6f, -1.2f, 0f), new Vector2(7.6f, 5.3f))
-            || IsInsideBox(position, ForestRegionOffset + new Vector3(31.5f, 0f, 0f), new Vector2(4.6f, 5.2f));
+            || IsInsideBox(position, ForestRegionOffset + new Vector3(31.5f, 0f, 0f), new Vector2(4.6f, 5.2f))
+            || IsInsideBox(position, ForestSmallBirdOffset, new Vector2(2.6f, 2.4f))
+            || IsInsideBox(position, ForestFallenBirdOffset, new Vector2(2.6f, 2.4f))
+            || IsInsideBox(position, ForestWellOffset, new Vector2(4.2f, 3.4f))
+            || IsInsideBox(position, MoleRewardOffset, new Vector2(3.2f, 3.0f))
+            || IsInsideForestRockClearZone(position)
+            || IsInsideMoleHoleClearZone(position);
+    }
+
+    private static bool TryPickDeepForestTreePosition(
+        System.Random random,
+        List<DecorationFootprint> usedFootprints,
+        Vector2 halfSize,
+        float minimumSpacing,
+        out Vector2 position)
+    {
+        return TryPickDeepForestDecorationPosition(random, usedFootprints, halfSize, minimumSpacing, out position);
+    }
+
+    private static bool TryPickDeepForestDecorationPosition(
+        System.Random random,
+        List<DecorationFootprint> usedFootprints,
+        Vector2 halfSize,
+        float minimumSpacing,
+        out Vector2 position)
+    {
+        float minimumSpacingSqr = minimumSpacing * minimumSpacing;
+        float minX = DeepForestRegionOffset.x + DecorationMin.x;
+        float maxX = DeepForestRegionOffset.x + DecorationMax.x;
+
+        for (int attempt = 0; attempt < DecorationPickAttempts; attempt++)
+        {
+            position = new Vector2(
+                RandomRange(random, minX, maxX),
+                RandomRange(random, DecorationMin.y, DecorationMax.y));
+
+            if (IsInsideDeepForestClearZone(position))
+            {
+                continue;
+            }
+
+            DecorationFootprint candidate = BuildDecorationFootprint(position, halfSize);
+            if (DoesFootprintOverlapDeepForestPath(candidate))
+            {
+                continue;
+            }
+
+            bool hasEnoughSpace = true;
+            for (int i = 0; i < usedFootprints.Count; i++)
+            {
+                if (DoFootprintsOverlap(candidate, usedFootprints[i])
+                    || (usedFootprints[i].GroundPosition - position).sqrMagnitude < minimumSpacingSqr)
+                {
+                    hasEnoughSpace = false;
+                    break;
+                }
+            }
+
+            if (hasEnoughSpace)
+            {
+                return true;
+            }
+        }
+
+        position = Vector2.zero;
+        return false;
+    }
+
+    private static bool IsInsideDeepForestClearZone(Vector2 position)
+    {
+        return IsInsideBox(position, DeepForestRegionOffset + new Vector3(-33f, 0f, 0f), new Vector2(5.2f, 4.6f))
+            || IsInsideBox(position, DeepForestRegionOffset + new Vector3(-9.2f, 6.2f, 0f), new Vector2(7.4f, 5.0f))
+            || IsInsideBox(position, DeepForestRegionOffset + new Vector3(31.5f, 0f, 0f), new Vector2(4.6f, 5.2f));
+    }
+
+    private static bool IsInsideMoleHoleClearZone(Vector2 position)
+    {
+        for (int i = 0; i < ForestMoleHoleOffsets.Length; i++)
+        {
+            if (IsInsideBox(position, ForestMoleHoleOffsets[i], new Vector2(2.2f, 1.8f)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsInsideForestRockClearZone(Vector2 position)
+    {
+        for (int i = 0; i < ForestRockOffsets.Length; i++)
+        {
+            if (IsInsideBox(position, ForestRockOffsets[i], new Vector2(2.4f, 1.9f)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool DoesFootprintOverlapForestPath(DecorationFootprint footprint)
     {
         Vector3[] centerLine = BuildForestExtensionPathCenterLine();
+        Vector2 footprintCenter = footprint.Center;
+        float blockingRadius = footprint.HalfSize.magnitude + PathDecorationClearance;
+
+        for (int pointIndex = 0; pointIndex < centerLine.Length - 1; pointIndex++)
+        {
+            Vector2 segmentStart = centerLine[pointIndex];
+            Vector2 segmentEnd = centerLine[pointIndex + 1];
+
+            if (DistanceToSegment(footprintCenter, segmentStart, segmentEnd) <= blockingRadius)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool DoesFootprintOverlapDeepForestPath(DecorationFootprint footprint)
+    {
+        Vector3[] centerLine = BuildDeepForestExtensionPathCenterLine();
         Vector2 footprintCenter = footprint.Center;
         float blockingRadius = footprint.HalfSize.magnitude + PathDecorationClearance;
 
@@ -1131,6 +1735,256 @@ public class SketchOutsideTransition : MonoBehaviour
         {
             RegisterLineReveal(leafOverlay, ForestEntranceOffset);
         }
+    }
+
+    private void EnsureBrownColoringApplied()
+    {
+        if (!GameProgress.HasColoredBrownDetails || propRoot == null)
+        {
+            return;
+        }
+
+        ApplyHouseBrownColoring();
+        ApplyPathBrownColoring();
+        ApplyFenceBrownColoring();
+        ApplyTreeTrunkBrownColoring();
+        ApplyForestEntranceBrownColoring();
+    }
+
+    private void ApplyHouseBrownColoring()
+    {
+        if (contentRoot != null)
+        {
+            CreateBrownLineOverlay(
+                "GeneratedOutsideHouseBrownOverlay",
+                HouseOffset,
+                BuildHouseBrownStrokes(),
+                PropSortingOrder + 8,
+                contentRoot.transform,
+                houseDrawing,
+                1.75f,
+                MapRevealDistance,
+                HouseOffset);
+        }
+
+        Transform neighborHouse = propRoot.transform.Find("GeneratedNeighborHouseWithMailbox");
+        SketchWorldLineDrawing neighborHouseDrawing = neighborHouse != null
+            ? neighborHouse.GetComponent<SketchWorldLineDrawing>()
+            : null;
+
+        CreateBrownLineOverlay(
+            "GeneratedNeighborHouseBrownOverlay",
+            NeighborHouseOffset,
+            BuildNeighborHouseBrownStrokes(),
+            PropSortingOrder + 8,
+            propRoot.transform,
+            neighborHouseDrawing,
+            1.65f,
+            MapRevealDistance,
+            NeighborHouseOffset);
+    }
+
+    private void ApplyPathBrownColoring()
+    {
+        Vector3[][] centerLines = BuildOutsidePathCenterLines();
+        string[] pathObjectNames =
+        {
+            "GeneratedOutsidePath_ToNeighborHouse",
+            "GeneratedOutsidePath_ToPond",
+            "GeneratedOutsidePath_ToForestEntrance"
+        };
+
+        for (int i = 0; i < pathObjectNames.Length && i < centerLines.Length; i++)
+        {
+            Transform pathTransform = propRoot.transform.Find(pathObjectNames[i]);
+            SketchWorldLineDrawing pathDrawing = pathTransform != null
+                ? pathTransform.GetComponent<SketchWorldLineDrawing>()
+                : null;
+
+            CreateBrownLineOverlay(
+                $"{pathObjectNames[i]}_BrownOverlay",
+                Vector3.zero,
+                BuildOutsidePathStrokes(centerLines[i]),
+                PathSortingOrder + 2,
+                propRoot.transform,
+                pathDrawing,
+                1.55f,
+                PathRevealDistance,
+                centerLines[i]);
+        }
+
+        if (GameProgress.HasDrawnForestSketch)
+        {
+            Vector3[] forestCenterLine = BuildForestExtensionPathCenterLine();
+            Transform forestPathTransform = propRoot.transform.Find("GeneratedForestExtensionPath");
+            SketchWorldLineDrawing forestPathDrawing = forestPathTransform != null
+                ? forestPathTransform.GetComponent<SketchWorldLineDrawing>()
+                : null;
+
+            CreateBrownLineOverlay(
+                "GeneratedForestExtensionPath_BrownOverlay",
+                Vector3.zero,
+                BuildOutsidePathStrokes(forestCenterLine),
+                PathSortingOrder + 2,
+                propRoot.transform,
+                forestPathDrawing,
+                1.55f,
+                PathRevealDistance,
+                forestCenterLine);
+        }
+
+    }
+
+    private void ApplyFenceBrownColoring()
+    {
+        float halfWidth = BackgroundSize.x * 0.5f;
+        float halfHeight = BackgroundSize.y * 0.5f;
+
+        CreateFenceBrownOverlay("GeneratedOutsideFence_Top", "GeneratedOutsideFenceBrown_Top", Vector3.zero, BuildFenceTopStrokes(), BuildHorizontalFenceRevealPoints(halfHeight, halfWidth));
+        CreateFenceBrownOverlay("GeneratedOutsideFence_Bottom", "GeneratedOutsideFenceBrown_Bottom", Vector3.zero, BuildFenceBottomStrokes(), BuildHorizontalFenceRevealPoints(-halfHeight, halfWidth));
+        CreateFenceBrownOverlay("GeneratedOutsideFence_Left", "GeneratedOutsideFenceBrown_Left", Vector3.zero, BuildFenceLeftStrokes(), BuildVerticalFenceRevealPoints(-halfWidth, halfHeight));
+
+        List<Vector3[]> rightFenceStrokes = GameProgress.HasDrawnForestSketch
+            ? BuildFenceRightGateStrokes()
+            : BuildFenceRightStrokes();
+        CreateFenceBrownOverlay("GeneratedOutsideFence_Right", "GeneratedOutsideFenceBrown_Right", Vector3.zero, rightFenceStrokes, BuildVerticalFenceRevealPoints(halfWidth, halfHeight));
+
+        if (GameProgress.HasDrawnForestSketch)
+        {
+            Transform forestFenceTransform = propRoot.transform.Find("GeneratedForestExtensionFence");
+            SketchWorldLineDrawing forestFenceDrawing = forestFenceTransform != null
+                ? forestFenceTransform.GetComponent<SketchWorldLineDrawing>()
+                : null;
+
+            CreateBrownLineOverlay(
+                "GeneratedForestExtensionFence_BrownOverlay",
+                ForestRegionOffset,
+                BuildForestExtensionBoundaryStrokes(),
+                PropSortingOrder + 7,
+                propRoot.transform,
+                forestFenceDrawing,
+                1.18f,
+                FenceRevealDistance,
+                BuildForestExtensionBoundaryRevealPoints());
+        }
+
+    }
+
+    private void CreateFenceBrownOverlay(string sourceObjectName, string overlayObjectName, Vector3 localPosition, List<Vector3[]> strokes, Vector3[] revealPositions)
+    {
+        Transform sourceTransform = propRoot.transform.Find(sourceObjectName);
+        SketchWorldLineDrawing sourceDrawing = sourceTransform != null
+            ? sourceTransform.GetComponent<SketchWorldLineDrawing>()
+            : null;
+
+        CreateBrownLineOverlay(
+            overlayObjectName,
+            localPosition,
+            strokes,
+            PropSortingOrder + 7,
+            propRoot.transform,
+            sourceDrawing,
+            1.18f,
+            FenceRevealDistance,
+            revealPositions);
+    }
+
+    private void ApplyTreeTrunkBrownColoring()
+    {
+        TreeCrayonColorTarget[] trees = propRoot.GetComponentsInChildren<TreeCrayonColorTarget>(true);
+
+        for (int i = 0; i < trees.Length; i++)
+        {
+            TreeCrayonColorTarget tree = trees[i];
+            if (tree == null)
+            {
+                continue;
+            }
+
+            CreateTreeTrunkOverlay(tree, tree.GetComponent<SketchWorldLineDrawing>(), TreeSortingOrder + 3);
+        }
+    }
+
+    private void CreateTreeTrunkOverlay(TreeCrayonColorTarget colorTarget, SketchWorldLineDrawing sourceDrawing, int sortingOrder)
+    {
+        if (colorTarget == null || colorTarget.transform.Find("GeneratedBrownTrunkOverlay") != null)
+        {
+            return;
+        }
+
+        GameObject overlayObject = new GameObject("GeneratedBrownTrunkOverlay");
+        overlayObject.transform.SetParent(colorTarget.transform, false);
+
+        SketchWorldLineDrawing trunkOverlay = overlayObject.AddComponent<SketchWorldLineDrawing>();
+        trunkOverlay.Configure(HouseLineWidth * 2.25f, BrownCrayonColor, sortingOrder);
+        trunkOverlay.SetStrokes(BuildPineTrunkBrownStrokes(colorTarget.TreeScale));
+
+        if (sourceDrawing != null && sourceDrawing.RevealProgress >= 0.95f)
+        {
+            trunkOverlay.RevealProgress = 1f;
+        }
+        else
+        {
+            RegisterLineReveal(trunkOverlay, colorTarget.transform.localPosition);
+        }
+    }
+
+    private void ApplyForestEntranceBrownColoring()
+    {
+        if (propRoot.transform.Find("GeneratedForestEntranceBrownTrunks") != null)
+        {
+            return;
+        }
+
+        Transform forestEntrance = propRoot.transform.Find("GeneratedForestEntranceLineDrawing");
+        SketchWorldLineDrawing sourceDrawing = forestEntrance != null
+            ? forestEntrance.GetComponent<SketchWorldLineDrawing>()
+            : null;
+
+        CreateBrownLineOverlay(
+            "GeneratedForestEntranceBrownTrunks",
+            ForestEntranceOffset,
+            BuildForestEntranceTrunkBrownStrokes(),
+            TreeSortingOrder + 5,
+            propRoot.transform,
+            sourceDrawing,
+            1.6f,
+            MapRevealDistance,
+            ForestEntranceOffset);
+    }
+
+    private SketchWorldLineDrawing CreateBrownLineOverlay(
+        string objectName,
+        Vector3 localPosition,
+        List<Vector3[]> strokes,
+        int sortingOrder,
+        Transform parent,
+        SketchWorldLineDrawing sourceDrawing,
+        float lineWidthMultiplier,
+        float revealDistance,
+        params Vector3[] revealPositions)
+    {
+        if (parent == null || parent.Find(objectName) != null)
+        {
+            return null;
+        }
+
+        SketchWorldLineDrawing overlay = CreateLineDrawing(objectName, localPosition, strokes, sortingOrder, parent, BrownCrayonColor);
+        overlay.Configure(HouseLineWidth * lineWidthMultiplier, BrownCrayonColor, sortingOrder);
+
+        if (sourceDrawing != null && sourceDrawing.RevealProgress >= 0.95f)
+        {
+            overlay.RevealProgress = 1f;
+        }
+        else
+        {
+            Vector3[] triggerPositions = revealPositions != null && revealPositions.Length > 0
+                ? revealPositions
+                : new[] { localPosition };
+            RegisterLineReveal(overlay, revealDistance, triggerPositions);
+        }
+
+        return overlay;
     }
 
     private static bool IsGrassColoringTarget(string objectName)
@@ -1932,6 +2786,11 @@ public class SketchOutsideTransition : MonoBehaviour
             CreateTreeLeafOverlay(colorTarget, pineTree, sortingOrder + 2);
         }
 
+        if (GameProgress.HasColoredBrownDetails)
+        {
+            CreateTreeTrunkOverlay(colorTarget, pineTree, sortingOrder + 3);
+        }
+
         return treeInteract;
     }
 
@@ -2129,6 +2988,23 @@ public class SketchOutsideTransition : MonoBehaviour
         };
     }
 
+    private static Vector3[] BuildDeepForestExtensionPathCenterLine()
+    {
+        float forestRight = ForestRegionOffset.x + BackgroundSize.x * 0.5f;
+
+        return new[]
+        {
+            ForestRegionOffset + new Vector3(31.2f, 0.1f, 0f),
+            new Vector3(forestRight, 0f, 0f),
+            DeepForestRegionOffset + new Vector3(-28.6f, -0.8f, 0f),
+            DeepForestRegionOffset + new Vector3(-18.0f, 2.8f, 0f),
+            DeepForestRegionOffset + new Vector3(-9.2f, 6.2f, 0f),
+            DeepForestRegionOffset + new Vector3(2.4f, 3.0f, 0f),
+            DeepForestRegionOffset + new Vector3(14.8f, 5.2f, 0f),
+            DeepForestRegionOffset + new Vector3(28.6f, 2.0f, 0f)
+        };
+    }
+
     private static List<Vector3[]> BuildOutsidePathStrokes(Vector3[] centerPoints)
     {
         List<Vector3[]> strokes = new List<Vector3[]>();
@@ -2282,6 +3158,105 @@ public class SketchOutsideTransition : MonoBehaviour
         return strokes;
     }
 
+    private static List<Vector3[]> BuildForestWellStrokes()
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+
+        strokes.Add(EllipsePoints(0f, 0.24f, 1.35f, 0.42f, 28));
+        strokes.Add(EllipsePoints(0f, 0.42f, 1.12f, 0.28f, 24));
+        strokes.Add(Points(-1.34f, 0.22f, -1.1f, -1.02f, -0.72f, -1.25f, 0f, -1.32f, 0.74f, -1.22f, 1.1f, -0.98f, 1.34f, 0.22f));
+        strokes.Add(Points(-1.04f, -0.22f, -0.48f, -0.36f, 0.02f, -0.24f, 0.58f, -0.38f, 1.04f, -0.2f));
+        strokes.Add(Points(-0.92f, -0.72f, -0.32f, -0.84f, 0.22f, -0.7f, 0.84f, -0.84f));
+        strokes.Add(Points(-0.88f, 0.58f, -0.88f, 1.9f));
+        strokes.Add(Points(0.88f, 0.58f, 0.88f, 1.9f));
+        strokes.Add(Points(-1.14f, 1.72f, -0.56f, 2.34f, 0f, 2.58f, 0.58f, 2.34f, 1.14f, 1.72f));
+        strokes.Add(Points(-0.74f, 1.75f, -0.2f, 2.2f, 0.3f, 2.2f, 0.76f, 1.75f));
+        strokes.Add(Points(-0.54f, 1.2f, 0.54f, 1.2f));
+        strokes.Add(Points(0f, 1.2f, 0f, 0.28f));
+        strokes.Add(Points(-0.26f, 0.18f, -0.18f, -0.22f, 0.18f, -0.22f, 0.26f, 0.18f, -0.26f, 0.18f));
+        strokes.Add(Points(1.02f, 1.2f, 1.28f, 1.34f, 1.44f, 1.18f, 1.28f, 1.02f, 1.02f, 1.2f));
+        strokes.Add(Points(-1.02f, 1.2f, -1.28f, 1.34f, -1.44f, 1.18f, -1.28f, 1.02f, -1.02f, 1.2f));
+
+        return strokes;
+    }
+
+    private static List<Vector3[]> BuildMoleHoleStrokes()
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+
+        strokes.Add(EllipsePoints(0f, 0f, 0.92f, 0.38f, 24));
+        strokes.Add(EllipsePoints(0.06f, 0.05f, 0.62f, 0.22f, 18));
+        strokes.Add(Points(-0.94f, -0.05f, -1.24f, -0.18f, -0.78f, -0.28f));
+        strokes.Add(Points(0.82f, -0.06f, 1.18f, -0.18f, 0.72f, -0.28f));
+        strokes.Add(Points(-0.54f, 0.36f, -0.16f, 0.48f, 0.24f, 0.38f, 0.58f, 0.5f));
+        strokes.Add(Points(-0.7f, -0.32f, -0.24f, -0.42f, 0.26f, -0.34f, 0.72f, -0.44f));
+
+        return strokes;
+    }
+
+    private static List<Vector3[]> BuildForestRockStrokes(float scale)
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+
+        strokes.Add(RockPoints(scale, -1.05f, -0.32f, -0.78f, 0.22f, -0.28f, 0.54f, 0.34f, 0.48f, 0.92f, 0.08f, 1.12f, -0.34f, 0.64f, -0.52f, -0.1f, -0.48f, -0.72f, -0.5f, -1.05f, -0.32f));
+        strokes.Add(RockPoints(scale, -0.72f, 0.18f, -0.36f, -0.02f, 0.08f, 0.22f, 0.42f, 0.04f, 0.74f, 0.18f));
+        strokes.Add(RockPoints(scale, -0.44f, -0.36f, -0.12f, -0.18f, 0.22f, -0.34f, 0.56f, -0.18f));
+        strokes.Add(RockPoints(scale, 0.12f, 0.42f, 0.0f, 0.16f, 0.18f, -0.08f));
+        strokes.Add(RockPoints(scale, -0.28f, 0.1f, -0.08f, -0.04f, -0.18f, -0.26f));
+
+        return strokes;
+    }
+
+    private static Vector3[] RockPoints(float scale, params float[] values)
+    {
+        int pointCount = values.Length / 2;
+        Vector3[] points = new Vector3[pointCount];
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            points[i] = new Vector3(values[i * 2] * scale, values[i * 2 + 1] * scale, 0f);
+        }
+
+        return points;
+    }
+
+    private static List<Vector3[]> BuildFallenBirdStrokes()
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+
+        strokes.Add(EllipsePoints(-0.06f, 0.24f, 0.72f, 0.36f, 24));
+        strokes.Add(EllipsePoints(0.68f, 0.34f, 0.28f, 0.24f, 16));
+        strokes.Add(Points(0.94f, 0.36f, 1.2f, 0.5f, 0.94f, 0.56f));
+        strokes.Add(Points(-0.42f, 0.34f, -0.96f, 0.62f, -0.78f, 0.08f, -0.42f, 0.34f));
+        strokes.Add(Points(-0.18f, 0.38f, 0.22f, 0.08f, 0.34f, 0.32f, -0.04f, 0.55f));
+        strokes.Add(Points(0.6f, 0.42f, 0.68f, 0.42f));
+        strokes.Add(Points(-0.18f, -0.08f, -0.4f, -0.34f, -0.68f, -0.28f));
+        strokes.Add(Points(0.18f, -0.08f, 0.32f, -0.38f, 0.62f, -0.34f));
+        strokes.Add(Points(-0.92f, -0.42f, -0.42f, -0.32f, 0.1f, -0.42f, 0.76f, -0.32f));
+        strokes.Add(Points(-0.58f, -0.22f, -0.3f, -0.12f, -0.02f, -0.18f, 0.26f, -0.06f, 0.56f, -0.16f));
+        strokes.Add(Points(-0.08f, 0.82f, 0.08f, 1.06f, 0.28f, 0.8f));
+
+        return strokes;
+    }
+
+    private static List<Vector3[]> BuildSmallBirdStrokes()
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+
+        strokes.Add(EllipsePoints(0f, 0.58f, 0.58f, 0.4f, 24));
+        strokes.Add(EllipsePoints(0.5f, 0.88f, 0.28f, 0.24f, 16));
+        strokes.Add(Points(0.76f, 0.88f, 1.06f, 0.98f, 0.78f, 1.04f));
+        strokes.Add(Points(-0.42f, 0.72f, -0.9f, 0.98f, -0.74f, 0.5f, -0.42f, 0.72f));
+        strokes.Add(Points(-0.16f, 0.72f, 0.24f, 0.5f, 0.34f, 0.72f, -0.02f, 0.92f));
+        strokes.Add(Points(0.42f, 0.96f, 0.5f, 0.96f));
+        strokes.Add(Points(-0.16f, 0.2f, -0.16f, -0.16f, -0.38f, -0.34f));
+        strokes.Add(Points(0.18f, 0.2f, 0.18f, -0.16f, 0.42f, -0.32f));
+        strokes.Add(Points(-0.74f, -0.34f, -0.24f, -0.22f, 0.28f, -0.32f, 0.76f, -0.22f));
+        strokes.Add(Points(-0.54f, -0.18f, -0.3f, -0.06f, 0.02f, -0.12f, 0.26f, 0.02f, 0.52f, -0.06f));
+
+        return strokes;
+    }
+
     private static Vector3[] EllipsePoints(float centerX, float centerY, float radiusX, float radiusY, int segmentCount)
     {
         Vector3[] points = new Vector3[segmentCount + 1];
@@ -2383,6 +3358,25 @@ public class SketchOutsideTransition : MonoBehaviour
         return strokes;
     }
 
+    private static List<Vector3[]> BuildForestExtensionBoundaryWithDeepGateStrokes()
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+        float left = -BackgroundSize.x * 0.5f + 0.45f;
+        float right = BackgroundSize.x * 0.5f - 0.45f;
+        float bottom = -BackgroundSize.y * 0.5f + 0.45f;
+        float top = BackgroundSize.y * 0.5f - 0.45f;
+
+        AddHorizontalWoodFence(strokes, left, right, top, -1f);
+        AddHorizontalWoodFence(strokes, left, right, bottom, 1f);
+        AddVerticalWoodFence(strokes, left, bottom, -ForestGateHalfHeight, 1f);
+        AddVerticalWoodFence(strokes, left, ForestGateHalfHeight, top, 1f);
+        AddVerticalWoodFence(strokes, right, bottom, -ForestGateHalfHeight, -1f);
+        AddVerticalWoodFence(strokes, right, ForestGateHalfHeight, top, -1f);
+        strokes.Add(Points(left + 0.8f, ForestGateHalfHeight, left + 1.38f, 1.18f, left + 0.8f, -ForestGateHalfHeight));
+        strokes.Add(Points(right - 0.8f, ForestGateHalfHeight, right - 1.38f, 1.18f, right - 0.8f, -ForestGateHalfHeight));
+        return strokes;
+    }
+
     private static Vector3[] BuildForestExtensionBoundaryRevealPoints()
     {
         float halfWidth = BackgroundSize.x * 0.5f;
@@ -2393,6 +3387,19 @@ public class SketchOutsideTransition : MonoBehaviour
         AddOffsetRevealPoints(points, BuildHorizontalFenceRevealPoints(-halfHeight, halfWidth), ForestRegionOffset);
         AddOffsetRevealPoints(points, BuildVerticalFenceRevealPoints(halfWidth, halfHeight), ForestRegionOffset);
         AddOffsetRevealPoints(points, BuildVerticalFenceRevealPoints(-halfWidth, halfHeight), ForestRegionOffset);
+        return points.ToArray();
+    }
+
+    private static Vector3[] BuildDeepForestExtensionBoundaryRevealPoints()
+    {
+        float halfWidth = BackgroundSize.x * 0.5f;
+        float halfHeight = BackgroundSize.y * 0.5f;
+        List<Vector3> points = new List<Vector3>();
+
+        AddOffsetRevealPoints(points, BuildHorizontalFenceRevealPoints(halfHeight, halfWidth), DeepForestRegionOffset);
+        AddOffsetRevealPoints(points, BuildHorizontalFenceRevealPoints(-halfHeight, halfWidth), DeepForestRegionOffset);
+        AddOffsetRevealPoints(points, BuildVerticalFenceRevealPoints(halfWidth, halfHeight), DeepForestRegionOffset);
+        AddOffsetRevealPoints(points, BuildVerticalFenceRevealPoints(-halfWidth, halfHeight), DeepForestRegionOffset);
         return points.ToArray();
     }
 
@@ -2554,6 +3561,13 @@ public class SketchOutsideTransition : MonoBehaviour
         return strokes;
     }
 
+    private static List<Vector3[]> BuildPineTrunkBrownStrokes(float scale)
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+        AddOutsidePineTrunk(strokes, 0f, 0f, scale);
+        return strokes;
+    }
+
     private static List<Vector3[]> BuildForestEntranceLeafStrokes()
     {
         List<Vector3[]> strokes = new List<Vector3[]>();
@@ -2562,6 +3576,17 @@ public class SketchOutsideTransition : MonoBehaviour
         AddOutsidePineLeaves(strokes, -0.24f, -1.38f, 0.9f);
         AddOutsidePineLeaves(strokes, 1.0f, -1.34f, 1.14f);
         AddOutsidePineLeaves(strokes, 2.35f, -1.36f, 0.86f);
+        return strokes;
+    }
+
+    private static List<Vector3[]> BuildForestEntranceTrunkBrownStrokes()
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+        AddOutsidePineTrunk(strokes, -2.5f, -1.36f, 0.82f);
+        AddOutsidePineTrunk(strokes, -1.42f, -1.34f, 1.02f);
+        AddOutsidePineTrunk(strokes, -0.24f, -1.38f, 0.9f);
+        AddOutsidePineTrunk(strokes, 1.0f, -1.34f, 1.14f);
+        AddOutsidePineTrunk(strokes, 2.35f, -1.36f, 0.86f);
         return strokes;
     }
 
@@ -2583,6 +3608,13 @@ public class SketchOutsideTransition : MonoBehaviour
         strokes.Add(PinePoints(centerX, groundY, scale, -0.82f, 1.05f, -0.24f, 1.22f, 0.34f, 1.04f, 0.82f, 1.18f));
         strokes.Add(PinePoints(centerX, groundY, scale, -1.0f, 0.5f, -0.46f, 0.72f, 0.08f, 0.52f, 0.62f, 0.72f, 1.02f, 0.5f));
         strokes.Add(PinePoints(centerX, groundY, scale, -0.9f, 0.14f, -0.34f, 0.28f, 0.18f, 0.1f, 0.76f, 0.24f));
+    }
+
+    private static void AddOutsidePineTrunk(List<Vector3[]> strokes, float centerX, float groundY, float scale)
+    {
+        strokes.Add(PinePoints(centerX, groundY, scale, -0.14f, 0f, -0.14f, -0.34f, 0.14f, -0.34f, 0.14f, 0f));
+        strokes.Add(PinePoints(centerX, groundY, scale, -0.06f, -0.3f, -0.1f, -0.04f, -0.32f, 0.34f));
+        strokes.Add(PinePoints(centerX, groundY, scale, 0.06f, -0.28f, 0.1f, -0.02f, 0.34f, 0.3f));
     }
 
     private static Vector3[] PinePoints(float centerX, float groundY, float scale, params float[] values)
@@ -2619,6 +3651,16 @@ public class SketchOutsideTransition : MonoBehaviour
         return strokes;
     }
 
+    private static List<Vector3[]> BuildHouseBrownStrokes()
+    {
+        List<Vector3[]> strokes = BuildHouseStrokes();
+        strokes.Add(Points(-2.05f, -0.95f, -1.1f, -0.84f, -0.2f, -0.96f, 0.78f, -0.84f, 1.9f, -0.94f));
+        strokes.Add(Points(-1.95f, -0.48f, -0.72f, -0.38f, 0.52f, -0.52f, 1.82f, -0.4f));
+        strokes.Add(Points(-1.82f, 0.03f, -0.62f, 0.14f, 0.62f, 0f, 1.75f, 0.14f));
+        strokes.Add(Points(-2.22f, 0.7f, -0.95f, 1.25f, 0f, 1.82f, 1.02f, 1.24f, 2.2f, 0.72f));
+        return strokes;
+    }
+
     private static List<Vector3[]> BuildNeighborHouseStrokes()
     {
         List<Vector3[]> strokes = new List<Vector3[]>();
@@ -2632,6 +3674,16 @@ public class SketchOutsideTransition : MonoBehaviour
         strokes.Add(Points(0.82f, -0.35f, 1.4f, -0.35f, 1.4f, 0.1f, 0.82f, 0.1f, 0.82f, -0.35f));
         strokes.Add(Points(-2.15f, -1.08f, -1.2f, -1.02f, -0.28f, -1.08f, 0.74f, -1.02f, 1.92f, -1.08f));
 
+        return strokes;
+    }
+
+    private static List<Vector3[]> BuildNeighborHouseBrownStrokes()
+    {
+        List<Vector3[]> strokes = BuildNeighborHouseStrokes();
+        strokes.Add(Points(-1.72f, -0.88f, -0.78f, -0.78f, 0.16f, -0.9f, 1.58f, -0.8f));
+        strokes.Add(Points(-1.64f, -0.42f, -0.48f, -0.3f, 0.48f, -0.42f, 1.52f, -0.28f));
+        strokes.Add(Points(-1.54f, 0.0f, -0.42f, 0.1f, 0.54f, -0.02f, 1.44f, 0.1f));
+        strokes.Add(Points(-2.0f, 0.4f, -0.9f, 0.92f, 0f, 1.42f, 0.9f, 0.92f, 2.0f, 0.4f));
         return strokes;
     }
 
@@ -2882,6 +3934,1916 @@ public class LetterFragmentInteract : MonoBehaviour, IInteractable
         {
             promptObject.SetActive(false);
         }
+    }
+
+    private void FindPlayer()
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        player = playerObject != null ? playerObject.transform : null;
+    }
+}
+
+public class ForestBranchTreeInteract : MonoBehaviour, IInteractable
+{
+    [SerializeField] private float interactDistance = 2.1f;
+
+    private const int BranchSortingOrder = 78;
+
+    private static Sprite pixelSprite;
+
+    private CircleCollider2D interactionCollider;
+    private SketchWorldLineDrawing lineDrawing;
+    private Transform player;
+    private GameObject promptObject;
+    private float treeScale = 1f;
+    private int promptSortingOrder = 72;
+    private bool hasConfigured;
+    private bool isDropping;
+
+    public void Configure(float scale, float distance, int sortingOrder)
+    {
+        treeScale = Mathf.Max(0.1f, scale);
+        interactDistance = Mathf.Max(0.2f, distance);
+        promptSortingOrder = sortingOrder;
+        hasConfigured = true;
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(CanDropBranch());
+    }
+
+    public void Interact(GameObject interactor)
+    {
+        if (!isActiveAndEnabled || !hasConfigured || !CanDropBranch() || isDropping || interactor == null)
+        {
+            return;
+        }
+
+        if (Vector2.Distance(transform.position, interactor.transform.position) > interactDistance)
+        {
+            return;
+        }
+
+        StartCoroutine(DropBranchRoutine(interactor.transform));
+    }
+
+    private void Awake()
+    {
+        lineDrawing = GetComponent<SketchWorldLineDrawing>();
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(false);
+    }
+
+    private void OnEnable()
+    {
+        FindPlayer();
+        SetInteractionAvailable(CanDropBranch());
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private void Update()
+    {
+        if (!hasConfigured || !CanDropBranch())
+        {
+            SetInteractionAvailable(false);
+            return;
+        }
+
+        if (player == null)
+        {
+            FindPlayer();
+        }
+
+        bool isRevealed = lineDrawing == null || lineDrawing.RevealProgress >= 0.95f;
+        bool isNear = player != null && Vector2.Distance(transform.position, player.position) <= interactDistance;
+
+        SetInteractionAvailable(isRevealed && !isDropping);
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(isRevealed && isNear && !isDropping);
+        }
+    }
+
+    private void OnDisable()
+    {
+        SetInteractionAvailable(false);
+    }
+
+    private IEnumerator DropBranchRoutine(Transform interactor)
+    {
+        isDropping = true;
+        SetInteractionAvailable(false);
+
+        yield return StartCoroutine(ShakeTreeRoutine());
+
+        Transform itemParent = transform.parent != null ? transform.parent : transform;
+        GameObject branchObject = CreateBranchObject(itemParent);
+        Vector3 startPosition = transform.position + new Vector3(0.18f * treeScale, 2.18f * treeScale, 0f);
+        Vector3 groundPosition = transform.position + new Vector3(0.66f * treeScale, 0.18f, 0f);
+        branchObject.transform.position = startPosition;
+
+        const float fallDuration = 0.36f;
+        float elapsed = 0f;
+
+        while (elapsed < fallDuration && branchObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / fallDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            branchObject.transform.position = Vector3.Lerp(startPosition, groundPosition, easedProgress);
+            branchObject.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(-18f, 38f, progress));
+            yield return null;
+        }
+
+        if (branchObject != null)
+        {
+            branchObject.transform.position = groundPosition;
+        }
+
+        yield return new WaitForSeconds(0.12f);
+
+        Vector3 collectStartPosition = branchObject != null ? branchObject.transform.position : groundPosition;
+        Vector3 fallbackTargetPosition = collectStartPosition + new Vector3(0f, 0.72f, 0f);
+        Vector3 startScale = branchObject != null ? branchObject.transform.localScale : Vector3.one;
+        const float collectDuration = 0.42f;
+        elapsed = 0f;
+
+        while (elapsed < collectDuration && branchObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / collectDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            Vector3 targetPosition = interactor != null
+                ? interactor.position + new Vector3(0f, 0.72f, 0f)
+                : fallbackTargetPosition;
+            Vector3 position = Vector3.Lerp(collectStartPosition, targetPosition, easedProgress);
+            position.y += Mathf.Sin(progress * Mathf.PI) * 0.18f;
+
+            branchObject.transform.position = position;
+            branchObject.transform.localScale = Vector3.Lerp(startScale, startScale * 0.2f, easedProgress);
+            yield return null;
+        }
+
+        GameProgress.CollectForestBranch();
+
+        if (branchObject != null)
+        {
+            Destroy(branchObject);
+        }
+
+        isDropping = false;
+        SetInteractionAvailable(false);
+    }
+
+    private IEnumerator ShakeTreeRoutine()
+    {
+        Quaternion baseRotation = transform.localRotation;
+        const float duration = 0.28f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / duration);
+            float shake = Mathf.Sin(progress * Mathf.PI * 6f) * (1f - progress);
+            transform.localRotation = baseRotation * Quaternion.Euler(0f, 0f, shake * 4.2f);
+            yield return null;
+        }
+
+        transform.localRotation = baseRotation;
+    }
+
+    private GameObject CreateBranchObject(Transform parent)
+    {
+        GameObject branchObject = new GameObject("GeneratedForestBranchReward");
+        branchObject.transform.SetParent(parent, true);
+        branchObject.transform.localScale = Vector3.one;
+
+        SketchWorldLineDrawing drawing = branchObject.AddComponent<SketchWorldLineDrawing>();
+        drawing.Configure(0.045f, new Color32(86, 58, 34, 255), BranchSortingOrder + 2);
+        drawing.SetStrokes(BuildBranchStrokes());
+        drawing.RevealProgress = 1f;
+
+        CreateBranchLeaf(branchObject.transform, new Vector3(-0.18f, 0.08f, 0f), new Vector3(0.16f, 0.07f, 1f), -22f);
+        CreateBranchLeaf(branchObject.transform, new Vector3(0.14f, -0.03f, 0f), new Vector3(0.14f, 0.06f, 1f), 28f);
+
+        return branchObject;
+    }
+
+    private static List<Vector3[]> BuildBranchStrokes()
+    {
+        return new List<Vector3[]>
+        {
+            Points(-0.48f, -0.1f, -0.16f, 0.02f, 0.18f, -0.04f, 0.5f, 0.12f),
+            Points(-0.08f, 0.0f, -0.24f, 0.22f),
+            Points(0.18f, -0.04f, 0.32f, -0.24f)
+        };
+    }
+
+    private static void CreateBranchLeaf(Transform parent, Vector3 localPosition, Vector3 localScale, float rotation)
+    {
+        GameObject leafObject = new GameObject("GeneratedForestBranchLeaf");
+        leafObject.transform.SetParent(parent, false);
+        leafObject.transform.localPosition = localPosition;
+        leafObject.transform.localScale = localScale;
+        leafObject.transform.localRotation = Quaternion.Euler(0f, 0f, rotation);
+
+        SpriteRenderer spriteRenderer = leafObject.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = GetPixelSprite();
+        spriteRenderer.color = new Color32(76, 142, 58, 220);
+        spriteRenderer.sortingOrder = BranchSortingOrder + 1;
+    }
+
+    private void EnsurePrompt()
+    {
+        if (promptObject == null)
+        {
+            promptObject = new GameObject("GeneratedForestBranchTreePrompt");
+            promptObject.transform.SetParent(transform, false);
+
+            TextMesh textMesh = promptObject.AddComponent<TextMesh>();
+            textMesh.text = "E";
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.fontSize = 64;
+            textMesh.characterSize = 0.075f;
+            textMesh.color = new Color32(35, 32, 28, 255);
+        }
+
+        promptObject.transform.localPosition = new Vector3(0f, 2.7f * treeScale, 0f);
+
+        MeshRenderer meshRenderer = promptObject.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            meshRenderer.sortingOrder = promptSortingOrder;
+        }
+
+        promptObject.SetActive(false);
+    }
+
+    private void EnsureCollider()
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.radius = interactDistance;
+            interactionCollider.offset = new Vector2(0f, 1.05f * treeScale);
+            return;
+        }
+
+        interactionCollider = gameObject.AddComponent<CircleCollider2D>();
+        interactionCollider.isTrigger = true;
+        interactionCollider.radius = interactDistance;
+        interactionCollider.offset = new Vector2(0f, 1.05f * treeScale);
+    }
+
+    private void SetInteractionAvailable(bool available)
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.enabled = available;
+        }
+
+        if (!available && promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private bool CanDropBranch()
+    {
+        return hasConfigured && !GameProgress.HasCollectedForestBranch;
+    }
+
+    private void FindPlayer()
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        player = playerObject != null ? playerObject.transform : null;
+    }
+
+    private static Sprite GetPixelSprite()
+    {
+        if (pixelSprite != null)
+        {
+            return pixelSprite;
+        }
+
+        Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        texture.SetPixel(0, 0, Color.white);
+        texture.Apply();
+
+        pixelSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+        pixelSprite.name = "GeneratedForestBranchRewardPixel";
+        return pixelSprite;
+    }
+
+    private static Vector3[] Points(params float[] values)
+    {
+        int pointCount = values.Length / 2;
+        Vector3[] points = new Vector3[pointCount];
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            points[i] = new Vector3(values[i * 2], values[i * 2 + 1], 0f);
+        }
+
+        return points;
+    }
+}
+
+public class MoleHoleInteract : MonoBehaviour, IInteractable
+{
+    [SerializeField] private int holeIndex;
+    [SerializeField] private float interactDistance = 1.45f;
+
+    private const int MoleSortingOrder = 86;
+    private const int CrayonSortingOrder = 82;
+
+    private static Sprite pixelSprite;
+
+    private CircleCollider2D interactionCollider;
+    private SketchWorldLineDrawing lineDrawing;
+    private Transform player;
+    private Transform rewardParent;
+    private GameObject promptObject;
+    private Vector3 baseScale;
+    private int promptSortingOrder = 72;
+    private bool hasConfigured;
+    private bool isInteracting;
+
+    public void Configure(int index, float distance, int sortingOrder, Transform parent)
+    {
+        holeIndex = index;
+        interactDistance = Mathf.Max(0.2f, distance);
+        promptSortingOrder = sortingOrder;
+        rewardParent = parent;
+        hasConfigured = true;
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(CanInteractWithHole());
+    }
+
+    public void Interact(GameObject interactor)
+    {
+        if (!isActiveAndEnabled || !hasConfigured || isInteracting || !CanInteractWithHole() || interactor == null)
+        {
+            return;
+        }
+
+        if (Vector2.Distance(transform.position, interactor.transform.position) > interactDistance)
+        {
+            return;
+        }
+
+        if (!GameProgress.InteractMoleHole(holeIndex))
+        {
+            SetInteractionAvailable(false);
+            return;
+        }
+
+        StartCoroutine(HoleInteractRoutine(interactor.transform));
+    }
+
+    private void Awake()
+    {
+        lineDrawing = GetComponent<SketchWorldLineDrawing>();
+        baseScale = transform.localScale;
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(false);
+    }
+
+    private void OnEnable()
+    {
+        FindPlayer();
+        SetInteractionAvailable(CanInteractWithHole());
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private void Update()
+    {
+        if (!hasConfigured || !CanInteractWithHole())
+        {
+            SetInteractionAvailable(false);
+            return;
+        }
+
+        if (player == null)
+        {
+            FindPlayer();
+        }
+
+        bool isRevealed = lineDrawing == null || lineDrawing.RevealProgress >= 0.95f;
+        bool isNear = player != null && Vector2.Distance(transform.position, player.position) <= interactDistance;
+
+        SetInteractionAvailable(isRevealed && !isInteracting);
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(isRevealed && isNear && !isInteracting);
+        }
+    }
+
+    private void OnDisable()
+    {
+        SetInteractionAvailable(false);
+    }
+
+    private IEnumerator HoleInteractRoutine(Transform interactor)
+    {
+        isInteracting = true;
+        SetInteractionAvailable(false);
+
+        const float tapDuration = 0.18f;
+        float elapsed = 0f;
+
+        while (elapsed < tapDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / tapDuration);
+            float pulse = Mathf.Sin(progress * Mathf.PI);
+            transform.localScale = baseScale * Mathf.Lerp(1f, 1.16f, pulse);
+            yield return null;
+        }
+
+        transform.localScale = baseScale;
+
+        if (GameProgress.HasCompletedMoleHoles && !GameProgress.HasCollectedBrownCrayon)
+        {
+            yield return StartCoroutine(SpawnMoleAndCrayonRoutine(interactor));
+        }
+
+        isInteracting = false;
+    }
+
+    private IEnumerator SpawnMoleAndCrayonRoutine(Transform interactor)
+    {
+        Transform parent = rewardParent != null ? rewardParent : transform.parent;
+        Vector3 rewardLocalPosition = parent != null
+            ? parent.InverseTransformPoint(transform.position)
+            : transform.localPosition;
+        Vector3 moleEndLocalPosition = rewardLocalPosition + new Vector3(0f, 0.34f, 0f);
+        GameObject moleObject = new GameObject("GeneratedMoleReward");
+        moleObject.transform.SetParent(parent, false);
+        moleObject.transform.localPosition = moleEndLocalPosition + new Vector3(0f, -0.74f, 0f);
+
+        SketchWorldLineDrawing moleDrawing = moleObject.AddComponent<SketchWorldLineDrawing>();
+        moleDrawing.Configure(0.074f, new Color32(58, 37, 25, 255), MoleSortingOrder);
+        moleDrawing.SetStrokes(BuildMoleStrokes());
+        moleDrawing.RevealProgress = 0f;
+
+        Vector3 moleStart = moleObject.transform.localPosition;
+        Vector3 moleEnd = moleEndLocalPosition;
+        const float emergeDuration = 0.48f;
+        float elapsed = 0f;
+
+        while (elapsed < emergeDuration && moleObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / emergeDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            moleObject.transform.localPosition = Vector3.Lerp(moleStart, moleEnd, easedProgress);
+            moleDrawing.RevealProgress = easedProgress;
+            yield return null;
+        }
+
+        if (moleObject == null)
+        {
+            yield break;
+        }
+
+        moleObject.transform.localPosition = moleEnd;
+        moleDrawing.RevealProgress = 1f;
+        yield return new WaitForSeconds(0.12f);
+
+        GameObject crayonObject = new GameObject("GeneratedBrownCrayonReward");
+        crayonObject.transform.SetParent(parent, false);
+        crayonObject.transform.localPosition = moleEndLocalPosition + new Vector3(0f, 0.92f, 0f);
+        CreateBrownCrayonVisual(crayonObject.transform);
+
+        Vector3 startPosition = crayonObject.transform.position;
+        Vector3 fallbackTargetPosition = startPosition + new Vector3(0f, 0.82f, 0f);
+        Vector3 startScale = crayonObject.transform.localScale;
+        Quaternion startRotation = crayonObject.transform.localRotation;
+        const float collectDuration = 0.52f;
+        elapsed = 0f;
+
+        while (elapsed < collectDuration && crayonObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / collectDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            Vector3 targetPosition = interactor != null
+                ? interactor.position + new Vector3(0f, 0.72f, 0f)
+                : fallbackTargetPosition;
+            Vector3 position = Vector3.Lerp(startPosition, targetPosition, easedProgress);
+            position.y += Mathf.Sin(progress * Mathf.PI) * 0.22f;
+
+            crayonObject.transform.position = position;
+            crayonObject.transform.localScale = Vector3.Lerp(startScale, startScale * 0.16f, easedProgress);
+            crayonObject.transform.localRotation = startRotation * Quaternion.Euler(0f, 0f, Mathf.Lerp(-16f, 20f, progress));
+            yield return null;
+        }
+
+        GameProgress.CollectBrownCrayon();
+        PencilFragmentHud.ShowCollected();
+
+        if (crayonObject != null)
+        {
+            Destroy(crayonObject);
+        }
+    }
+
+    private void EnsurePrompt()
+    {
+        if (promptObject == null)
+        {
+            promptObject = new GameObject("GeneratedMoleHolePrompt");
+            promptObject.transform.SetParent(transform, false);
+            promptObject.transform.localPosition = new Vector3(0f, 0.82f, 0f);
+
+            TextMesh textMesh = promptObject.AddComponent<TextMesh>();
+            textMesh.text = "E";
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.fontSize = 64;
+            textMesh.characterSize = 0.075f;
+            textMesh.color = new Color32(35, 32, 28, 255);
+        }
+
+        MeshRenderer meshRenderer = promptObject.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            meshRenderer.sortingOrder = promptSortingOrder;
+        }
+
+        promptObject.SetActive(false);
+    }
+
+    private void EnsureCollider()
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.radius = interactDistance;
+            return;
+        }
+
+        interactionCollider = gameObject.AddComponent<CircleCollider2D>();
+        interactionCollider.isTrigger = true;
+        interactionCollider.radius = interactDistance;
+    }
+
+    private void SetInteractionAvailable(bool available)
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.enabled = available;
+        }
+
+        if (!available && promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private bool CanInteractWithHole()
+    {
+        return hasConfigured
+            && !GameProgress.HasCollectedBrownCrayon
+            && !GameProgress.HasInteractedMoleHole(holeIndex);
+    }
+
+    private void FindPlayer()
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        player = playerObject != null ? playerObject.transform : null;
+    }
+
+    private static List<Vector3[]> BuildMoleStrokes()
+    {
+        return new List<Vector3[]>
+        {
+            Points(-0.9f, -0.18f, -0.62f, 0.42f, -0.18f, 0.72f, 0.34f, 0.72f, 0.78f, 0.42f, 0.96f, -0.18f),
+            Points(-0.58f, 0.26f, -0.36f, 0.48f, 0.04f, 0.56f, 0.44f, 0.46f, 0.68f, 0.22f),
+            Points(-0.64f, 0.38f, -0.82f, 0.8f, -0.46f, 0.72f),
+            Points(0.56f, 0.5f, 0.88f, 0.82f, 0.72f, 0.36f),
+            EllipsePoints(-0.25f, 0.26f, 0.07f, 0.09f, 12),
+            EllipsePoints(0.38f, 0.26f, 0.07f, 0.09f, 12),
+            EllipsePoints(0.07f, 0.09f, 0.12f, 0.08f, 14),
+            Points(-0.08f, -0.04f, 0.05f, -0.13f, 0.22f, -0.04f),
+            Points(-0.04f, -0.14f, -0.02f, -0.3f, 0.12f, -0.3f, 0.16f, -0.14f),
+            Points(-0.06f, 0.08f, -0.42f, 0.17f),
+            Points(-0.07f, 0.0f, -0.43f, -0.02f),
+            Points(0.2f, 0.08f, 0.58f, 0.17f),
+            Points(0.2f, 0.0f, 0.58f, -0.02f),
+            Points(-0.48f, -0.02f, -0.66f, -0.1f),
+            Points(0.62f, -0.02f, 0.8f, -0.1f),
+            Points(-1.08f, -0.2f, -0.62f, -0.34f, 0.1f, -0.28f, 0.82f, -0.36f, 1.16f, -0.22f)
+        };
+    }
+
+    private static Vector3[] EllipsePoints(float centerX, float centerY, float radiusX, float radiusY, int segmentCount)
+    {
+        Vector3[] points = new Vector3[segmentCount + 1];
+
+        for (int i = 0; i <= segmentCount; i++)
+        {
+            float angle = Mathf.PI * 2f * i / segmentCount;
+            points[i] = new Vector3(
+                centerX + Mathf.Cos(angle) * radiusX,
+                centerY + Mathf.Sin(angle) * radiusY,
+                0f);
+        }
+
+        return points;
+    }
+
+    private static void CreateBrownCrayonVisual(Transform crayonTransform)
+    {
+        CreateCrayonPart(crayonTransform, "GeneratedBrownCrayonBody", new Vector3(-0.06f, 0f, 0f), new Vector3(0.62f, 0.14f, 1f), new Color32(151, 87, 42, 255), CrayonSortingOrder);
+        CreateCrayonPart(crayonTransform, "GeneratedBrownCrayonTip", new Vector3(0.3f, 0f, 0f), new Vector3(0.14f, 0.1f, 1f), new Color32(93, 54, 31, 255), CrayonSortingOrder + 1);
+        CreateCrayonPart(crayonTransform, "GeneratedBrownCrayonWrapper", new Vector3(-0.18f, 0f, 0f), new Vector3(0.16f, 0.16f, 1f), new Color32(229, 185, 121, 255), CrayonSortingOrder + 2);
+        CreateCrayonPart(crayonTransform, "GeneratedBrownCrayonBackEdge", new Vector3(-0.42f, 0f, 0f), new Vector3(0.08f, 0.15f, 1f), new Color32(111, 64, 33, 255), CrayonSortingOrder + 2);
+
+        SketchWorldLineDrawing outline = crayonTransform.gameObject.AddComponent<SketchWorldLineDrawing>();
+        outline.Configure(0.035f, new Color32(66, 42, 25, 255), CrayonSortingOrder + 3);
+        outline.SetStrokes(new[]
+        {
+            Points(-0.48f, -0.09f, 0.22f, -0.09f, 0.44f, 0f, 0.22f, 0.09f, -0.48f, 0.09f, -0.48f, -0.09f),
+            Points(0.22f, -0.09f, 0.22f, 0.09f),
+            Points(-0.28f, -0.1f, -0.28f, 0.1f)
+        });
+        outline.RevealProgress = 1f;
+    }
+
+    private static void CreateCrayonPart(Transform parent, string objectName, Vector3 localPosition, Vector3 localScale, Color color, int sortingOrder)
+    {
+        GameObject partObject = new GameObject(objectName);
+        partObject.transform.SetParent(parent, false);
+        partObject.transform.localPosition = localPosition;
+        partObject.transform.localScale = localScale;
+
+        SpriteRenderer spriteRenderer = partObject.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = GetPixelSprite();
+        spriteRenderer.color = color;
+        spriteRenderer.sortingOrder = sortingOrder;
+    }
+
+    private static Sprite GetPixelSprite()
+    {
+        if (pixelSprite != null)
+        {
+            return pixelSprite;
+        }
+
+        Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        texture.SetPixel(0, 0, Color.white);
+        texture.Apply();
+
+        pixelSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+        pixelSprite.name = "GeneratedMoleBrownCrayonRewardPixel";
+        return pixelSprite;
+    }
+
+    private static Vector3[] Points(params float[] values)
+    {
+        int pointCount = values.Length / 2;
+        Vector3[] points = new Vector3[pointCount];
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            points[i] = new Vector3(values[i * 2], values[i * 2 + 1], 0f);
+        }
+
+        return points;
+    }
+}
+
+public class ForestRockCrackInteract : MonoBehaviour, IInteractable
+{
+    [SerializeField] private bool containsPencilFragment;
+    [SerializeField] private float interactDistance = 1.65f;
+
+    private const int RewardSortingOrder = 78;
+
+    private static Sprite pixelSprite;
+
+    private CircleCollider2D interactionCollider;
+    private SketchWorldLineDrawing lineDrawing;
+    private Transform player;
+    private GameObject promptObject;
+    private int promptSortingOrder = 72;
+    private bool hasConfigured;
+    private bool hasInspected;
+    private bool isInspecting;
+
+    public void Configure(bool hasReward, float distance, int sortingOrder)
+    {
+        containsPencilFragment = hasReward;
+        interactDistance = Mathf.Max(0.2f, distance);
+        promptSortingOrder = sortingOrder;
+        hasConfigured = true;
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(CanInspectRock());
+    }
+
+    public void Interact(GameObject interactor)
+    {
+        if (!isActiveAndEnabled || !hasConfigured || !CanInspectRock() || isInspecting || interactor == null)
+        {
+            return;
+        }
+
+        if (Vector2.Distance(transform.position, interactor.transform.position) > interactDistance)
+        {
+            return;
+        }
+
+        StartCoroutine(InspectRoutine(interactor.transform));
+    }
+
+    private void Awake()
+    {
+        lineDrawing = GetComponent<SketchWorldLineDrawing>();
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(false);
+    }
+
+    private void OnEnable()
+    {
+        FindPlayer();
+        SetInteractionAvailable(CanInspectRock());
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private void Update()
+    {
+        if (!hasConfigured || !CanInspectRock())
+        {
+            SetInteractionAvailable(false);
+            return;
+        }
+
+        if (player == null)
+        {
+            FindPlayer();
+        }
+
+        bool isRevealed = lineDrawing == null || lineDrawing.RevealProgress >= 0.95f;
+        bool isNear = player != null && Vector2.Distance(transform.position, player.position) <= interactDistance;
+
+        SetInteractionAvailable(isRevealed && !isInspecting);
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(isRevealed && isNear && !isInspecting);
+        }
+    }
+
+    private void OnDisable()
+    {
+        SetInteractionAvailable(false);
+    }
+
+    private IEnumerator InspectRoutine(Transform interactor)
+    {
+        isInspecting = true;
+        SetInteractionAvailable(false);
+
+        Vector3 basePosition = transform.localPosition;
+        Quaternion baseRotation = transform.localRotation;
+        const float duration = 0.42f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / duration);
+            float shake = Mathf.Sin(progress * Mathf.PI * 7f) * (1f - progress);
+            float lift = Mathf.Sin(progress * Mathf.PI) * 0.04f;
+            transform.localPosition = basePosition + new Vector3(shake * 0.07f, lift, 0f);
+            transform.localRotation = baseRotation * Quaternion.Euler(0f, 0f, shake * 5f);
+            yield return null;
+        }
+
+        transform.localPosition = basePosition;
+        transform.localRotation = baseRotation;
+        hasInspected = true;
+
+        if (containsPencilFragment && !GameProgress.HasCollectedPencilFragmentFrom(PencilFragmentSource.RockCrack))
+        {
+            GameProgress.DropPencilFragmentFrom(PencilFragmentSource.RockCrack);
+            yield return DeliverPencilFragmentRoutine(interactor);
+        }
+        else
+        {
+            yield return new WaitForSeconds(0.08f);
+        }
+
+        isInspecting = false;
+        SetInteractionAvailable(CanInspectRock());
+    }
+
+    private IEnumerator DeliverPencilFragmentRoutine(Transform interactor)
+    {
+        Transform itemParent = transform.parent != null ? transform.parent : transform;
+        GameObject rewardObject = new GameObject("GeneratedForestRockPencilReward");
+        rewardObject.transform.SetParent(itemParent, true);
+        rewardObject.transform.position = transform.position + new Vector3(0f, 0.72f, 0f);
+        CreatePencilFragmentVisual(rewardObject.transform);
+
+        Vector3 startPosition = rewardObject.transform.position;
+        Vector3 fallbackTargetPosition = startPosition + new Vector3(0f, 0.78f, 0f);
+        Vector3 startScale = rewardObject.transform.localScale;
+        Quaternion startRotation = rewardObject.transform.localRotation;
+        const float collectDuration = 0.52f;
+        float elapsed = 0f;
+
+        while (elapsed < collectDuration && rewardObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / collectDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            Vector3 targetPosition = interactor != null
+                ? interactor.position + new Vector3(0f, 0.72f, 0f)
+                : fallbackTargetPosition;
+            Vector3 position = Vector3.Lerp(startPosition, targetPosition, easedProgress);
+            position.y += Mathf.Sin(progress * Mathf.PI) * 0.24f;
+
+            rewardObject.transform.position = position;
+            rewardObject.transform.localScale = Vector3.Lerp(startScale, startScale * 0.18f, easedProgress);
+            rewardObject.transform.localRotation = startRotation * Quaternion.Euler(0f, 0f, Mathf.Lerp(12f, -24f, progress));
+            yield return null;
+        }
+
+        GameProgress.CollectPencilFragmentFrom(PencilFragmentSource.RockCrack);
+        PencilFragmentHud.ShowCollected();
+
+        if (rewardObject != null)
+        {
+            Destroy(rewardObject);
+        }
+    }
+
+    private void EnsurePrompt()
+    {
+        if (promptObject == null)
+        {
+            promptObject = new GameObject("GeneratedForestRockPrompt");
+            promptObject.transform.SetParent(transform, false);
+            promptObject.transform.localPosition = new Vector3(0f, 1.05f, 0f);
+
+            TextMesh textMesh = promptObject.AddComponent<TextMesh>();
+            textMesh.text = "E";
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.fontSize = 64;
+            textMesh.characterSize = 0.075f;
+            textMesh.color = new Color32(35, 32, 28, 255);
+        }
+
+        MeshRenderer meshRenderer = promptObject.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            meshRenderer.sortingOrder = promptSortingOrder;
+        }
+
+        promptObject.SetActive(false);
+    }
+
+    private void EnsureCollider()
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.radius = interactDistance;
+            return;
+        }
+
+        interactionCollider = gameObject.AddComponent<CircleCollider2D>();
+        interactionCollider.isTrigger = true;
+        interactionCollider.radius = interactDistance;
+        interactionCollider.offset = new Vector2(0f, 0.08f);
+    }
+
+    private void SetInteractionAvailable(bool available)
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.enabled = available;
+        }
+
+        if (!available && promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private bool CanInspectRock()
+    {
+        return hasConfigured
+            && !GameProgress.HasCollectedPencilFragmentFrom(PencilFragmentSource.RockCrack)
+            && (!hasInspected || containsPencilFragment);
+    }
+
+    private void CreatePencilFragmentVisual(Transform pencilTransform)
+    {
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentBody", new Vector3(-0.06f, 0f, 0f), new Vector3(0.48f, 0.12f, 1f), new Color32(236, 181, 51, 255), RewardSortingOrder);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentWood", new Vector3(0.24f, 0f, 0f), new Vector3(0.16f, 0.12f, 1f), new Color32(203, 143, 77, 255), RewardSortingOrder + 1);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentLead", new Vector3(0.34f, 0f, 0f), new Vector3(0.08f, 0.08f, 1f), new Color32(44, 40, 36, 255), RewardSortingOrder + 2);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentPaintEdge", new Vector3(-0.33f, 0f, 0f), new Vector3(0.08f, 0.13f, 1f), new Color32(190, 66, 72, 255), RewardSortingOrder + 2);
+
+        SketchWorldLineDrawing outline = pencilTransform.gameObject.AddComponent<SketchWorldLineDrawing>();
+        outline.Configure(0.035f, new Color32(38, 34, 28, 255), RewardSortingOrder + 3);
+        outline.SetStrokes(new[]
+        {
+            Points(-0.38f, -0.08f, 0.2f, -0.08f, 0.4f, 0f, 0.2f, 0.08f, -0.38f, 0.08f, -0.38f, -0.08f),
+            Points(0.2f, -0.08f, 0.2f, 0.08f),
+            Points(-0.28f, -0.08f, -0.28f, 0.08f)
+        });
+        outline.RevealProgress = 1f;
+    }
+
+    private static void CreatePencilPart(Transform parent, string objectName, Vector3 localPosition, Vector3 localScale, Color color, int sortingOrder)
+    {
+        GameObject partObject = new GameObject(objectName);
+        partObject.transform.SetParent(parent, false);
+        partObject.transform.localPosition = localPosition;
+        partObject.transform.localScale = localScale;
+
+        SpriteRenderer spriteRenderer = partObject.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = GetPixelSprite();
+        spriteRenderer.color = color;
+        spriteRenderer.sortingOrder = sortingOrder;
+    }
+
+    private static Sprite GetPixelSprite()
+    {
+        if (pixelSprite != null)
+        {
+            return pixelSprite;
+        }
+
+        Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        texture.SetPixel(0, 0, Color.white);
+        texture.Apply();
+
+        pixelSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+        pixelSprite.name = "GeneratedForestRockPencilRewardPixel";
+        return pixelSprite;
+    }
+
+    private static Vector3[] Points(params float[] values)
+    {
+        int pointCount = values.Length / 2;
+        Vector3[] points = new Vector3[pointCount];
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            points[i] = new Vector3(values[i * 2], values[i * 2 + 1], 0f);
+        }
+
+        return points;
+    }
+
+    private void FindPlayer()
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        player = playerObject != null ? playerObject.transform : null;
+    }
+}
+
+public class ForestFallenBirdInteract : MonoBehaviour, IInteractable
+{
+    [SerializeField] private float interactDistance = 2.15f;
+
+    private const int RewardSortingOrder = 78;
+
+    private static Sprite pixelSprite;
+
+    private CircleCollider2D interactionCollider;
+    private SketchWorldLineDrawing lineDrawing;
+    private Transform player;
+    private GameObject promptObject;
+    private int promptSortingOrder = 72;
+    private bool hasConfigured;
+    private bool isHelping;
+
+    public void Configure(float distance, int sortingOrder)
+    {
+        interactDistance = Mathf.Max(0.2f, distance);
+        promptSortingOrder = sortingOrder;
+        hasConfigured = true;
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(CanHelpFallenBird());
+    }
+
+    public void Interact(GameObject interactor)
+    {
+        if (!isActiveAndEnabled || !hasConfigured || !CanHelpFallenBird() || isHelping || interactor == null)
+        {
+            return;
+        }
+
+        if (Vector2.Distance(transform.position, interactor.transform.position) > interactDistance)
+        {
+            return;
+        }
+
+        StartCoroutine(HelpRoutine(interactor.transform));
+    }
+
+    private void Awake()
+    {
+        lineDrawing = GetComponent<SketchWorldLineDrawing>();
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(false);
+    }
+
+    private void OnEnable()
+    {
+        FindPlayer();
+        SetInteractionAvailable(CanHelpFallenBird());
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private void Update()
+    {
+        if (!hasConfigured || !CanHelpFallenBird())
+        {
+            SetInteractionAvailable(false);
+            return;
+        }
+
+        if (player == null)
+        {
+            FindPlayer();
+        }
+
+        bool isRevealed = lineDrawing == null || lineDrawing.RevealProgress >= 0.95f;
+        bool isNear = player != null && Vector2.Distance(transform.position, player.position) <= interactDistance;
+
+        SetInteractionAvailable(isRevealed && !isHelping);
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(isRevealed && isNear && !isHelping);
+        }
+    }
+
+    private void OnDisable()
+    {
+        SetInteractionAvailable(false);
+    }
+
+    private IEnumerator HelpRoutine(Transform interactor)
+    {
+        isHelping = true;
+        SetInteractionAvailable(false);
+
+        Vector3 basePosition = transform.localPosition;
+        Quaternion baseRotation = transform.localRotation;
+        const float duration = 0.54f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / duration);
+            float lift = Mathf.Sin(progress * Mathf.PI) * 0.12f;
+            float wobble = Mathf.Sin(progress * Mathf.PI * 5f) * (1f - progress);
+            transform.localPosition = basePosition + new Vector3(wobble * 0.04f, lift, 0f);
+            transform.localRotation = baseRotation * Quaternion.Euler(0f, 0f, wobble * 4f);
+            yield return null;
+        }
+
+        transform.localPosition = basePosition;
+        transform.localRotation = baseRotation;
+        GameProgress.HelpFallenBird();
+        yield return DeliverPencilFragmentRoutine(interactor);
+        isHelping = false;
+        SetInteractionAvailable(false);
+    }
+
+    private IEnumerator DeliverPencilFragmentRoutine(Transform interactor)
+    {
+        if (GameProgress.HasCollectedPencilFragmentFrom(PencilFragmentSource.FallenBird))
+        {
+            yield break;
+        }
+
+        Transform itemParent = transform.parent != null ? transform.parent : transform;
+        GameObject rewardObject = new GameObject("GeneratedForestFallenBirdPencilReward");
+        rewardObject.transform.SetParent(itemParent, true);
+        rewardObject.transform.position = transform.position + new Vector3(0f, 0.72f, 0f);
+        CreatePencilFragmentVisual(rewardObject.transform);
+
+        Vector3 startPosition = rewardObject.transform.position;
+        Vector3 fallbackTargetPosition = startPosition + new Vector3(0f, 0.78f, 0f);
+        Vector3 startScale = rewardObject.transform.localScale;
+        Quaternion startRotation = rewardObject.transform.localRotation;
+        const float collectDuration = 0.52f;
+        float elapsed = 0f;
+
+        while (elapsed < collectDuration && rewardObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / collectDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            Vector3 targetPosition = interactor != null
+                ? interactor.position + new Vector3(0f, 0.72f, 0f)
+                : fallbackTargetPosition;
+            Vector3 position = Vector3.Lerp(startPosition, targetPosition, easedProgress);
+            position.y += Mathf.Sin(progress * Mathf.PI) * 0.24f;
+
+            rewardObject.transform.position = position;
+            rewardObject.transform.localScale = Vector3.Lerp(startScale, startScale * 0.18f, easedProgress);
+            rewardObject.transform.localRotation = startRotation * Quaternion.Euler(0f, 0f, Mathf.Lerp(16f, -20f, progress));
+            yield return null;
+        }
+
+        GameProgress.CollectPencilFragmentFrom(PencilFragmentSource.FallenBird);
+        PencilFragmentHud.ShowCollected();
+
+        if (rewardObject != null)
+        {
+            Destroy(rewardObject);
+        }
+    }
+
+    private void EnsurePrompt()
+    {
+        if (promptObject == null)
+        {
+            promptObject = new GameObject("GeneratedForestFallenBirdPrompt");
+            promptObject.transform.SetParent(transform, false);
+            promptObject.transform.localPosition = new Vector3(0f, 1.28f, 0f);
+
+            TextMesh textMesh = promptObject.AddComponent<TextMesh>();
+            textMesh.text = "E";
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.fontSize = 64;
+            textMesh.characterSize = 0.075f;
+            textMesh.color = new Color32(35, 32, 28, 255);
+        }
+
+        MeshRenderer meshRenderer = promptObject.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            meshRenderer.sortingOrder = promptSortingOrder;
+        }
+
+        promptObject.SetActive(false);
+    }
+
+    private void EnsureCollider()
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.radius = interactDistance;
+            return;
+        }
+
+        interactionCollider = gameObject.AddComponent<CircleCollider2D>();
+        interactionCollider.isTrigger = true;
+        interactionCollider.radius = interactDistance;
+        interactionCollider.offset = new Vector2(0f, 0.18f);
+    }
+
+    private void SetInteractionAvailable(bool available)
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.enabled = available;
+        }
+
+        if (!available && promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private bool CanHelpFallenBird()
+    {
+        return hasConfigured
+            && GameProgress.HasCollectedWellWaterBottle
+            && !GameProgress.HasHelpedFallenBird;
+    }
+
+    private void CreatePencilFragmentVisual(Transform pencilTransform)
+    {
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentBody", new Vector3(-0.06f, 0f, 0f), new Vector3(0.48f, 0.12f, 1f), new Color32(236, 181, 51, 255), RewardSortingOrder);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentWood", new Vector3(0.24f, 0f, 0f), new Vector3(0.16f, 0.12f, 1f), new Color32(203, 143, 77, 255), RewardSortingOrder + 1);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentLead", new Vector3(0.34f, 0f, 0f), new Vector3(0.08f, 0.08f, 1f), new Color32(44, 40, 36, 255), RewardSortingOrder + 2);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentPaintEdge", new Vector3(-0.33f, 0f, 0f), new Vector3(0.08f, 0.13f, 1f), new Color32(190, 66, 72, 255), RewardSortingOrder + 2);
+
+        SketchWorldLineDrawing outline = pencilTransform.gameObject.AddComponent<SketchWorldLineDrawing>();
+        outline.Configure(0.035f, new Color32(38, 34, 28, 255), RewardSortingOrder + 3);
+        outline.SetStrokes(new[]
+        {
+            Points(-0.38f, -0.08f, 0.2f, -0.08f, 0.4f, 0f, 0.2f, 0.08f, -0.38f, 0.08f, -0.38f, -0.08f),
+            Points(0.2f, -0.08f, 0.2f, 0.08f),
+            Points(-0.28f, -0.08f, -0.28f, 0.08f)
+        });
+        outline.RevealProgress = 1f;
+    }
+
+    private static void CreatePencilPart(Transform parent, string objectName, Vector3 localPosition, Vector3 localScale, Color color, int sortingOrder)
+    {
+        GameObject partObject = new GameObject(objectName);
+        partObject.transform.SetParent(parent, false);
+        partObject.transform.localPosition = localPosition;
+        partObject.transform.localScale = localScale;
+
+        SpriteRenderer spriteRenderer = partObject.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = GetPixelSprite();
+        spriteRenderer.color = color;
+        spriteRenderer.sortingOrder = sortingOrder;
+    }
+
+    private static Sprite GetPixelSprite()
+    {
+        if (pixelSprite != null)
+        {
+            return pixelSprite;
+        }
+
+        Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        texture.SetPixel(0, 0, Color.white);
+        texture.Apply();
+
+        pixelSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+        pixelSprite.name = "GeneratedForestFallenBirdPencilRewardPixel";
+        return pixelSprite;
+    }
+
+    private static Vector3[] Points(params float[] values)
+    {
+        int pointCount = values.Length / 2;
+        Vector3[] points = new Vector3[pointCount];
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            points[i] = new Vector3(values[i * 2], values[i * 2 + 1], 0f);
+        }
+
+        return points;
+    }
+
+    private void FindPlayer()
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        player = playerObject != null ? playerObject.transform : null;
+    }
+}
+
+public class ForestBirdQuestInteract : MonoBehaviour, IInteractable
+{
+    [SerializeField] private float interactDistance = 2.15f;
+
+    private const string SearchingPrompt = "[\uB098\uBB47\uAC00\uC9C0]+[?]";
+    private const string CompletePrompt = "[\uB098\uBB47\uAC00\uC9C0]+[!]";
+    private const float PromptPulseSpeed = 4.4f;
+    private const int RewardSortingOrder = 78;
+
+    private static Sprite pixelSprite;
+
+    private CircleCollider2D interactionCollider;
+    private SketchWorldLineDrawing lineDrawing;
+    private Transform player;
+    private GameObject promptObject;
+    private TextMesh promptText;
+    private TextMesh promptInnerGlowText;
+    private TextMesh promptOuterGlowText;
+    private int promptSortingOrder = 72;
+    private bool hasConfigured;
+    private bool isReacting;
+    private bool isDeliveringReward;
+
+    public void Configure(float distance, int sortingOrder)
+    {
+        interactDistance = Mathf.Max(0.2f, distance);
+        promptSortingOrder = sortingOrder;
+        hasConfigured = true;
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(CanInteractWithBird());
+    }
+
+    public void Interact(GameObject interactor)
+    {
+        if (!isActiveAndEnabled || !hasConfigured || isDeliveringReward || !CanInteractWithBird() || interactor == null)
+        {
+            return;
+        }
+
+        if (Vector2.Distance(transform.position, interactor.transform.position) > interactDistance)
+        {
+            return;
+        }
+
+        GameProgress.MeetForestBird();
+
+        if (CanDeliverReward())
+        {
+            StartCoroutine(DeliverPencilFragmentRoutine(interactor.transform));
+            return;
+        }
+
+        if (!isReacting)
+        {
+            StartCoroutine(WeakReactionRoutine());
+        }
+    }
+
+    private void Awake()
+    {
+        lineDrawing = GetComponent<SketchWorldLineDrawing>();
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(false);
+    }
+
+    private void OnEnable()
+    {
+        FindPlayer();
+        SetInteractionAvailable(CanInteractWithBird());
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private void Update()
+    {
+        if (!hasConfigured || !CanInteractWithBird())
+        {
+            SetInteractionAvailable(false);
+            return;
+        }
+
+        if (player == null)
+        {
+            FindPlayer();
+        }
+
+        bool isRevealed = lineDrawing == null || lineDrawing.RevealProgress >= 0.95f;
+        bool isNear = player != null && Vector2.Distance(transform.position, player.position) <= interactDistance;
+
+        SetInteractionAvailable(isRevealed && !isDeliveringReward);
+
+        if (promptObject != null)
+        {
+            SetPromptText(GameProgress.HasCollectedForestBranch ? CompletePrompt : SearchingPrompt);
+            promptObject.SetActive(isRevealed && isNear && !isDeliveringReward);
+        }
+
+        UpdatePromptGlow();
+    }
+
+    private void OnDisable()
+    {
+        SetInteractionAvailable(false);
+    }
+
+    private IEnumerator WeakReactionRoutine()
+    {
+        isReacting = true;
+        Vector3 basePosition = transform.localPosition;
+        Quaternion baseRotation = transform.localRotation;
+        const float duration = 0.34f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / duration);
+            float shake = Mathf.Sin(progress * Mathf.PI * 4f) * (1f - progress);
+            transform.localPosition = basePosition + Vector3.right * shake * 0.06f;
+            transform.localRotation = baseRotation * Quaternion.Euler(0f, 0f, shake * 5f);
+            yield return null;
+        }
+
+        transform.localPosition = basePosition;
+        transform.localRotation = baseRotation;
+        isReacting = false;
+    }
+
+    private IEnumerator DeliverPencilFragmentRoutine(Transform interactor)
+    {
+        isDeliveringReward = true;
+        SetInteractionAvailable(false);
+
+        Transform itemParent = transform.parent != null ? transform.parent : transform;
+        GameObject rewardObject = new GameObject("GeneratedForestBirdPencilReward");
+        rewardObject.transform.SetParent(itemParent, true);
+        rewardObject.transform.position = transform.position + new Vector3(0f, 0.78f, 0f);
+        CreatePencilFragmentVisual(rewardObject.transform);
+
+        Vector3 startPosition = rewardObject.transform.position;
+        Vector3 fallbackTargetPosition = startPosition + new Vector3(0f, 0.78f, 0f);
+        Vector3 startScale = rewardObject.transform.localScale;
+        Quaternion startRotation = rewardObject.transform.localRotation;
+        const float collectDuration = 0.52f;
+        float elapsed = 0f;
+
+        while (elapsed < collectDuration && rewardObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / collectDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            Vector3 targetPosition = interactor != null
+                ? interactor.position + new Vector3(0f, 0.72f, 0f)
+                : fallbackTargetPosition;
+            Vector3 position = Vector3.Lerp(startPosition, targetPosition, easedProgress);
+            position.y += Mathf.Sin(progress * Mathf.PI) * 0.24f;
+
+            rewardObject.transform.position = position;
+            rewardObject.transform.localScale = Vector3.Lerp(startScale, startScale * 0.18f, easedProgress);
+            rewardObject.transform.localRotation = startRotation * Quaternion.Euler(0f, 0f, Mathf.Lerp(-14f, 20f, progress));
+            yield return null;
+        }
+
+        GameProgress.CollectPencilFragmentFrom(PencilFragmentSource.Bird);
+        PencilFragmentHud.ShowCollected();
+
+        if (rewardObject != null)
+        {
+            Destroy(rewardObject);
+        }
+
+        isDeliveringReward = false;
+        SetInteractionAvailable(false);
+    }
+
+    private void EnsurePrompt()
+    {
+        if (promptObject != null)
+        {
+            return;
+        }
+
+        promptObject = new GameObject("GeneratedForestBirdPrompt");
+        promptObject.transform.SetParent(transform, false);
+        promptObject.transform.localPosition = new Vector3(0f, 1.38f, 0f);
+
+        promptOuterGlowText = CreatePromptText(
+            "GeneratedForestBirdPromptOuterGlow",
+            0.104f,
+            new Color(1f, 0.74f, 0.12f, 0.26f),
+            promptSortingOrder - 2);
+        promptInnerGlowText = CreatePromptText(
+            "GeneratedForestBirdPromptInnerGlow",
+            0.086f,
+            new Color(1f, 0.84f, 0.24f, 0.62f),
+            promptSortingOrder - 1);
+        promptText = CreatePromptText(
+            "GeneratedForestBirdPromptText",
+            0.07f,
+            new Color32(35, 32, 28, 255),
+            promptSortingOrder);
+
+        promptObject.SetActive(false);
+    }
+
+    private TextMesh CreatePromptText(string objectName, float characterSize, Color color, int sortingOrder)
+    {
+        GameObject textObject = new GameObject(objectName);
+        textObject.transform.SetParent(promptObject.transform, false);
+        textObject.transform.localPosition = Vector3.zero;
+
+        TextMesh textMesh = textObject.AddComponent<TextMesh>();
+        textMesh.text = SearchingPrompt;
+        textMesh.anchor = TextAnchor.MiddleCenter;
+        textMesh.alignment = TextAlignment.Center;
+        textMesh.fontSize = 64;
+        textMesh.characterSize = characterSize;
+        textMesh.color = color;
+
+        MeshRenderer meshRenderer = textObject.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            meshRenderer.sortingOrder = sortingOrder;
+        }
+
+        return textMesh;
+    }
+
+    private void SetPromptText(string value)
+    {
+        if (promptText != null)
+        {
+            promptText.text = value;
+        }
+
+        if (promptInnerGlowText != null)
+        {
+            promptInnerGlowText.text = value;
+        }
+
+        if (promptOuterGlowText != null)
+        {
+            promptOuterGlowText.text = value;
+        }
+    }
+
+    private void UpdatePromptGlow()
+    {
+        if (promptObject == null || !promptObject.activeSelf)
+        {
+            return;
+        }
+
+        float pulse = Mathf.SmoothStep(0f, 1f, (Mathf.Sin(Time.time * PromptPulseSpeed) + 1f) * 0.5f);
+
+        if (promptText != null)
+        {
+            promptText.color = Color.Lerp(
+                new Color32(35, 32, 28, 255),
+                new Color32(82, 62, 8, 255),
+                pulse);
+        }
+
+        if (promptInnerGlowText != null)
+        {
+            promptInnerGlowText.transform.localScale = Vector3.one * Mathf.Lerp(1.02f, 1.12f, pulse);
+            promptInnerGlowText.color = new Color(1f, 0.84f, 0.24f, Mathf.Lerp(0.45f, 0.82f, pulse));
+        }
+
+        if (promptOuterGlowText != null)
+        {
+            promptOuterGlowText.transform.localScale = Vector3.one * Mathf.Lerp(1.08f, 1.24f, pulse);
+            promptOuterGlowText.color = new Color(1f, 0.74f, 0.12f, Mathf.Lerp(0.16f, 0.42f, pulse));
+        }
+    }
+
+    private void EnsureCollider()
+    {
+        if (interactionCollider != null)
+        {
+            return;
+        }
+
+        interactionCollider = gameObject.AddComponent<CircleCollider2D>();
+        interactionCollider.isTrigger = true;
+        interactionCollider.radius = interactDistance;
+        interactionCollider.offset = new Vector2(0f, 0.18f);
+    }
+
+    private void SetInteractionAvailable(bool available)
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.enabled = available;
+        }
+
+        if (!available && promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private bool CanInteractWithBird()
+    {
+        return hasConfigured && !GameProgress.HasCollectedPencilFragmentFrom(PencilFragmentSource.Bird);
+    }
+
+    private bool CanDeliverReward()
+    {
+        return GameProgress.HasCollectedForestBranch
+            && !GameProgress.HasCollectedPencilFragmentFrom(PencilFragmentSource.Bird);
+    }
+
+    private void CreatePencilFragmentVisual(Transform pencilTransform)
+    {
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentBody", new Vector3(-0.06f, 0f, 0f), new Vector3(0.48f, 0.12f, 1f), new Color32(236, 181, 51, 255), RewardSortingOrder);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentWood", new Vector3(0.24f, 0f, 0f), new Vector3(0.16f, 0.12f, 1f), new Color32(203, 143, 77, 255), RewardSortingOrder + 1);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentLead", new Vector3(0.34f, 0f, 0f), new Vector3(0.08f, 0.08f, 1f), new Color32(44, 40, 36, 255), RewardSortingOrder + 2);
+        CreatePencilPart(pencilTransform, "GeneratedPencilFragmentPaintEdge", new Vector3(-0.33f, 0f, 0f), new Vector3(0.08f, 0.13f, 1f), new Color32(190, 66, 72, 255), RewardSortingOrder + 2);
+
+        SketchWorldLineDrawing outline = pencilTransform.gameObject.AddComponent<SketchWorldLineDrawing>();
+        outline.Configure(0.035f, new Color32(38, 34, 28, 255), RewardSortingOrder + 3);
+        outline.SetStrokes(new[]
+        {
+            Points(-0.38f, -0.08f, 0.2f, -0.08f, 0.4f, 0f, 0.2f, 0.08f, -0.38f, 0.08f, -0.38f, -0.08f),
+            Points(0.2f, -0.08f, 0.2f, 0.08f),
+            Points(-0.28f, -0.08f, -0.28f, 0.08f)
+        });
+        outline.RevealProgress = 1f;
+    }
+
+    private static void CreatePencilPart(Transform parent, string objectName, Vector3 localPosition, Vector3 localScale, Color color, int sortingOrder)
+    {
+        GameObject partObject = new GameObject(objectName);
+        partObject.transform.SetParent(parent, false);
+        partObject.transform.localPosition = localPosition;
+        partObject.transform.localScale = localScale;
+
+        SpriteRenderer spriteRenderer = partObject.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = GetPixelSprite();
+        spriteRenderer.color = color;
+        spriteRenderer.sortingOrder = sortingOrder;
+    }
+
+    private static Sprite GetPixelSprite()
+    {
+        if (pixelSprite != null)
+        {
+            return pixelSprite;
+        }
+
+        Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        texture.SetPixel(0, 0, Color.white);
+        texture.Apply();
+
+        pixelSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+        pixelSprite.name = "GeneratedForestBirdPencilRewardPixel";
+        return pixelSprite;
+    }
+
+    private static Vector3[] Points(params float[] values)
+    {
+        int pointCount = values.Length / 2;
+        Vector3[] points = new Vector3[pointCount];
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            points[i] = new Vector3(values[i * 2], values[i * 2 + 1], 0f);
+        }
+
+        return points;
+    }
+
+    private void FindPlayer()
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        player = playerObject != null ? playerObject.transform : null;
+    }
+}
+
+public class ForestWellBottleInteract : MonoBehaviour, IInteractable
+{
+    [SerializeField] private float interactDistance = 1.9f;
+
+    private const int BottleSortingOrder = 78;
+
+    private Transform player;
+    private GameObject promptObject;
+    private CircleCollider2D interactionCollider;
+    private SketchWorldLineDrawing lineDrawing;
+    private int promptSortingOrder = 72;
+    private bool hasConfigured;
+    private bool isCollecting;
+
+    public void Configure(float distance, int sortingOrder)
+    {
+        interactDistance = Mathf.Max(0.2f, distance);
+        promptSortingOrder = sortingOrder;
+        hasConfigured = true;
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(CanCollect());
+    }
+
+    public void Interact(GameObject interactor)
+    {
+        if (!isActiveAndEnabled || !hasConfigured || !CanCollect() || isCollecting || interactor == null)
+        {
+            return;
+        }
+
+        if (Vector2.Distance(transform.position, interactor.transform.position) > interactDistance)
+        {
+            return;
+        }
+
+        StartCoroutine(CollectRoutine(interactor.transform));
+    }
+
+    private void Awake()
+    {
+        lineDrawing = GetComponent<SketchWorldLineDrawing>();
+        EnsurePrompt();
+        EnsureCollider();
+        SetInteractionAvailable(false);
+    }
+
+    private void OnEnable()
+    {
+        FindPlayer();
+        SetInteractionAvailable(CanCollect());
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private void Update()
+    {
+        if (!hasConfigured || !CanCollect())
+        {
+            SetInteractionAvailable(false);
+            return;
+        }
+
+        if (player == null)
+        {
+            FindPlayer();
+        }
+
+        bool isRevealed = lineDrawing == null || lineDrawing.RevealProgress >= 0.95f;
+        bool isNear = player != null && Vector2.Distance(transform.position, player.position) <= interactDistance;
+
+        SetInteractionAvailable(isRevealed && !isCollecting);
+
+        if (promptObject != null)
+        {
+            promptObject.SetActive(isRevealed && isNear && !isCollecting);
+        }
+    }
+
+    private void OnDisable()
+    {
+        SetInteractionAvailable(false);
+    }
+
+    private IEnumerator CollectRoutine(Transform interactor)
+    {
+        isCollecting = true;
+        SetInteractionAvailable(false);
+
+        Transform itemParent = transform.parent != null ? transform.parent : transform;
+        GameObject bottleObject = CreateWaterBottleObject(itemParent);
+        bottleObject.transform.position = transform.position + new Vector3(0f, 1.42f, 0f);
+
+        Vector3 startPosition = bottleObject.transform.position;
+        Vector3 fallbackTargetPosition = startPosition + new Vector3(0f, 0.82f, 0f);
+        Vector3 startScale = bottleObject.transform.localScale;
+        Quaternion startRotation = bottleObject.transform.localRotation;
+        const float collectDuration = 0.5f;
+        float elapsed = 0f;
+
+        while (elapsed < collectDuration && bottleObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / collectDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            Vector3 targetPosition = interactor != null
+                ? interactor.position + new Vector3(0f, 0.72f, 0f)
+                : fallbackTargetPosition;
+            Vector3 position = Vector3.Lerp(startPosition, targetPosition, easedProgress);
+            position.y += Mathf.Sin(progress * Mathf.PI) * 0.26f;
+
+            bottleObject.transform.position = position;
+            bottleObject.transform.localScale = Vector3.Lerp(startScale, startScale * 0.18f, easedProgress);
+            bottleObject.transform.localRotation = startRotation * Quaternion.Euler(0f, 0f, Mathf.Lerp(-10f, 24f, progress));
+            yield return null;
+        }
+
+        GameProgress.CollectWellWaterBottle();
+
+        if (bottleObject != null)
+        {
+            Destroy(bottleObject);
+        }
+
+        isCollecting = false;
+        SetInteractionAvailable(false);
+    }
+
+    private bool CanCollect()
+    {
+        return hasConfigured && !GameProgress.HasCollectedWellWaterBottle;
+    }
+
+    private void EnsurePrompt()
+    {
+        if (promptObject == null)
+        {
+            promptObject = new GameObject("GeneratedForestWellPrompt");
+            promptObject.transform.SetParent(transform, false);
+            promptObject.transform.localPosition = new Vector3(0f, 2.72f, 0f);
+
+            TextMesh textMesh = promptObject.AddComponent<TextMesh>();
+            textMesh.text = "E";
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.fontSize = 64;
+            textMesh.characterSize = 0.075f;
+            textMesh.color = new Color32(35, 32, 28, 255);
+        }
+
+        MeshRenderer meshRenderer = promptObject.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            meshRenderer.sortingOrder = promptSortingOrder;
+        }
+
+        promptObject.SetActive(false);
+    }
+
+    private void EnsureCollider()
+    {
+        if (interactionCollider != null)
+        {
+            return;
+        }
+
+        interactionCollider = gameObject.AddComponent<CircleCollider2D>();
+        interactionCollider.isTrigger = true;
+        interactionCollider.radius = interactDistance;
+        interactionCollider.offset = new Vector2(0f, 0.28f);
+    }
+
+    private void SetInteractionAvailable(bool available)
+    {
+        if (interactionCollider != null)
+        {
+            interactionCollider.enabled = available;
+        }
+
+        if (!available && promptObject != null)
+        {
+            promptObject.SetActive(false);
+        }
+    }
+
+    private GameObject CreateWaterBottleObject(Transform parent)
+    {
+        GameObject bottleObject = new GameObject("GeneratedWellWaterBottleReward");
+        bottleObject.transform.SetParent(parent, true);
+        bottleObject.transform.localScale = Vector3.one;
+
+        SketchWorldLineDrawing outline = bottleObject.AddComponent<SketchWorldLineDrawing>();
+        outline.Configure(0.035f, new Color32(37, 92, 94, 230), BottleSortingOrder);
+        outline.SetStrokes(BuildWaterBottleOutlineStrokes());
+        outline.RevealProgress = 1f;
+
+        GameObject waterObject = new GameObject("GeneratedWellWaterBottleFill");
+        waterObject.transform.SetParent(bottleObject.transform, false);
+
+        SketchWorldLineDrawing water = waterObject.AddComponent<SketchWorldLineDrawing>();
+        water.Configure(0.05f, new Color32(72, 151, 190, 210), BottleSortingOrder + 1);
+        water.SetStrokes(BuildWaterBottleWaterStrokes());
+        water.RevealProgress = 1f;
+
+        return bottleObject;
+    }
+
+    private static List<Vector3[]> BuildWaterBottleOutlineStrokes()
+    {
+        return new List<Vector3[]>
+        {
+            Points(-0.18f, 0.44f, -0.18f, 0.24f, -0.34f, 0.08f, -0.38f, -0.42f, -0.24f, -0.72f, 0.24f, -0.72f, 0.38f, -0.42f, 0.34f, 0.08f, 0.18f, 0.24f, 0.18f, 0.44f, -0.18f, 0.44f),
+            Points(-0.14f, 0.6f, -0.14f, 0.44f, 0.14f, 0.44f, 0.14f, 0.6f, -0.14f, 0.6f),
+            Points(-0.2f, 0.62f, 0.2f, 0.62f),
+            Points(-0.28f, -0.44f, 0.28f, -0.44f)
+        };
+    }
+
+    private static List<Vector3[]> BuildWaterBottleWaterStrokes()
+    {
+        return new List<Vector3[]>
+        {
+            Points(-0.28f, -0.32f, -0.12f, -0.26f, 0.08f, -0.34f, 0.26f, -0.28f),
+            Points(-0.26f, -0.48f, 0.24f, -0.48f),
+            Points(-0.18f, -0.58f, 0.18f, -0.58f)
+        };
+    }
+
+    private static Vector3[] Points(params float[] values)
+    {
+        int pointCount = values.Length / 2;
+        Vector3[] points = new Vector3[pointCount];
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            points[i] = new Vector3(values[i * 2], values[i * 2 + 1], 0f);
+        }
+
+        return points;
     }
 
     private void FindPlayer()
