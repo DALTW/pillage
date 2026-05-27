@@ -73,11 +73,12 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         bool shouldPlayDrawingAnimation = !GameProgress.HasPlayedSketchbookDrawing;
         bool shouldPlayForestExpansion = !shouldPlayDrawingAnimation && GameProgress.CanExtendPencilAtSketchbook;
         bool shouldPlayDeepForestExpansion = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && GameProgress.CanExtendDeepForestAtSketchbook;
-        bool shouldPlayGreenColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && GameProgress.CanColorVillageAtSketchbook;
-        bool shouldPlayBrownColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && !shouldPlayGreenColoring && GameProgress.CanColorBrownDetailsAtSketchbook;
+        bool shouldPlayFourthForestExpansion = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && GameProgress.CanExtendFourthForestAtSketchbook;
+        bool shouldPlayGreenColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && !shouldPlayFourthForestExpansion && GameProgress.CanColorVillageAtSketchbook;
+        bool shouldPlayBrownColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && !shouldPlayFourthForestExpansion && !shouldPlayGreenColoring && GameProgress.CanColorBrownDetailsAtSketchbook;
         GameProgress.CheckSketchbook();
         isOpen = true;
-        isFirstDrawingLocked = shouldPlayDrawingAnimation || shouldPlayForestExpansion || shouldPlayDeepForestExpansion || shouldPlayGreenColoring || shouldPlayBrownColoring;
+        isFirstDrawingLocked = shouldPlayDrawingAnimation || shouldPlayForestExpansion || shouldPlayDeepForestExpansion || shouldPlayFourthForestExpansion || shouldPlayGreenColoring || shouldPlayBrownColoring;
         LockPlayerForFirstDrawing(interactor);
         bigSketchbookUI.SetActive(true);
 
@@ -98,7 +99,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
             }
         }
 
-        scaleRoutine = StartCoroutine(OpenScaleUI(bigSketchbookUI.transform.localScale, shouldPlayDrawingAnimation, shouldPlayForestExpansion, shouldPlayDeepForestExpansion, shouldPlayGreenColoring, shouldPlayBrownColoring));
+        scaleRoutine = StartCoroutine(OpenScaleUI(bigSketchbookUI.transform.localScale, shouldPlayDrawingAnimation, shouldPlayForestExpansion, shouldPlayDeepForestExpansion, shouldPlayFourthForestExpansion, shouldPlayGreenColoring, shouldPlayBrownColoring));
     }
 
     private void CloseSketchbook()
@@ -129,7 +130,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         scaleRoutine = StartCoroutine(CloseScaleUI());
     }
 
-    private IEnumerator OpenScaleUI(Vector3 startScale, bool shouldPlayDrawingAnimation, bool shouldPlayForestExpansion, bool shouldPlayDeepForestExpansion, bool shouldPlayGreenColoring, bool shouldPlayBrownColoring)
+    private IEnumerator OpenScaleUI(Vector3 startScale, bool shouldPlayDrawingAnimation, bool shouldPlayForestExpansion, bool shouldPlayDeepForestExpansion, bool shouldPlayFourthForestExpansion, bool shouldPlayGreenColoring, bool shouldPlayBrownColoring)
     {
         yield return ScaleUI(startScale, openScale);
 
@@ -144,6 +145,10 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         else if (isOpen && shouldPlayDeepForestExpansion && sketchbookDrawingAnimation != null)
         {
             sketchbookDrawingAnimation.PlayDeepForestExpansion(CompleteDeepForestExpansionDrawing);
+        }
+        else if (isOpen && shouldPlayFourthForestExpansion && sketchbookDrawingAnimation != null)
+        {
+            sketchbookDrawingAnimation.PlayFourthForestExpansion(CompleteFourthForestExpansionDrawing);
         }
         else if (isOpen && shouldPlayGreenColoring && sketchbookDrawingAnimation != null)
         {
@@ -243,6 +248,28 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
     private void CompleteDeepForestExpansionDrawing()
     {
         GameProgress.CompleteSketchbookDeepForestDrawing();
+        SketchOutsideTransition.ApplySketchbookDeepForestUnlock();
+
+        if (GameProgress.HasCollectedGreenCrayon)
+        {
+            GameProgress.ColorVillageGreen();
+            SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
+        }
+
+        if (GameProgress.HasCollectedBrownCrayon)
+        {
+            GameProgress.ColorBrownDetails();
+            SketchOutsideTransition.ApplySketchbookBrownColoring();
+        }
+
+        PencilFragmentHud.RefreshCollected();
+        UnlockPlayerAfterFirstDrawing();
+    }
+
+    private void CompleteFourthForestExpansionDrawing()
+    {
+        GameProgress.CompleteSketchbookFourthForestDrawing();
+        SketchOutsideTransition.ApplySketchbookFourthForestUnlock();
 
         if (GameProgress.HasCollectedGreenCrayon)
         {

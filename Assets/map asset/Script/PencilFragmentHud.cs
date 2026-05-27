@@ -471,12 +471,20 @@ public class LetterQuestHud : MonoBehaviour
     private static LetterQuestHud instance;
     private static Sprite fragmentSprite;
     private static Sprite completedLetterSprite;
+    private static Sprite waterBottleSprite;
+    private static Sprite acornSprite;
+    private static Sprite mushroomSprite;
 
     private const float IconStartX = 18f;
     private const float IconY = -70f;
     private const float FragmentIconSpacing = 42f;
+    private const float CompletedLetterWaterBottleOffset = 82f;
+    private const float CollectibleIconSpacing = 42f;
 
     private readonly List<GameObject> iconObjects = new List<GameObject>();
+    private GameObject waterBottleIconObject;
+    private GameObject acornIconObject;
+    private GameObject mushroomIconObject;
 
     public static void ShowProgress()
     {
@@ -521,9 +529,13 @@ public class LetterQuestHud : MonoBehaviour
     private void RefreshIcons()
     {
         int collectedCount = GameProgress.AvailableLetterFragmentCount;
+        bool hasWaterBottleIcon = GameProgress.HasCollectedWellWaterBottle;
+        bool hasAcornIcon = GameProgress.HasCollectedAcorn;
+        bool hasMushroomIcon = GameProgress.HasCollectedMushroom;
+        bool shouldReserveDeliveredLetterSlot = GameProgress.HasDeliveredCompletedLetter;
         HideChildrenWithPrefix("GeneratedLetterQuestHudIcon_");
 
-        if (collectedCount <= 0)
+        if (collectedCount <= 0 && !hasWaterBottleIcon && !hasAcornIcon && !hasMushroomIcon)
         {
             for (int i = 0; i < iconObjects.Count; i++)
             {
@@ -531,6 +543,21 @@ public class LetterQuestHud : MonoBehaviour
                 {
                     iconObjects[i].SetActive(false);
                 }
+            }
+
+            if (waterBottleIconObject != null)
+            {
+                waterBottleIconObject.SetActive(false);
+            }
+
+            if (acornIconObject != null)
+            {
+                acornIconObject.SetActive(false);
+            }
+
+            if (mushroomIconObject != null)
+            {
+                mushroomIconObject.SetActive(false);
             }
 
             gameObject.SetActive(false);
@@ -591,6 +618,14 @@ public class LetterQuestHud : MonoBehaviour
                 image.sprite = GetFragmentSprite();
             }
         }
+
+        float waterBottleX = GetCollectibleIconX(hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount, 0);
+        float acornX = GetAcornIconX(hasWaterBottleIcon, waterBottleX, hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount);
+        RefreshWaterBottleIcon(hasWaterBottleIcon, waterBottleX);
+        RefreshAcornIcon(hasAcornIcon, acornX);
+        RefreshMushroomIcon(
+            hasMushroomIcon,
+            GetMushroomIconX(hasAcornIcon, acornX, hasWaterBottleIcon, waterBottleX, hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount));
     }
 
     private GameObject CreateIconObject(int index)
@@ -623,6 +658,222 @@ public class LetterQuestHud : MonoBehaviour
         image.raycastTarget = false;
 
         return iconObject;
+    }
+
+    private void RefreshWaterBottleIcon(bool shouldShow, float x)
+    {
+        if (!shouldShow)
+        {
+            if (waterBottleIconObject != null)
+            {
+                waterBottleIconObject.SetActive(false);
+            }
+
+            return;
+        }
+
+        if (waterBottleIconObject == null)
+        {
+            waterBottleIconObject = CreateWaterBottleIconObject();
+        }
+
+        waterBottleIconObject.SetActive(true);
+
+        Image image = waterBottleIconObject.GetComponent<Image>();
+        if (image != null)
+        {
+            image.sprite = GetWaterBottleSprite();
+            image.color = Color.white;
+        }
+
+        RectTransform rectTransform = waterBottleIconObject.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.anchoredPosition = new Vector2(x, IconY + 2f);
+            rectTransform.sizeDelta = new Vector2(34f, 46f);
+        }
+    }
+
+    private GameObject CreateWaterBottleIconObject()
+    {
+        GameObject iconObject = new GameObject("GeneratedLetterQuestHudWaterBottleIcon");
+        iconObject.transform.SetParent(transform, false);
+
+        RectTransform rectTransform = iconObject.AddComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(0f, 1f);
+        rectTransform.pivot = new Vector2(0f, 1f);
+        rectTransform.anchoredPosition = new Vector2(IconStartX, IconY + 2f);
+        rectTransform.sizeDelta = new Vector2(34f, 46f);
+
+        Image image = iconObject.AddComponent<Image>();
+        image.sprite = GetWaterBottleSprite();
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+
+        return iconObject;
+    }
+
+    private void RefreshAcornIcon(bool shouldShow, float x)
+    {
+        if (!shouldShow)
+        {
+            if (acornIconObject != null)
+            {
+                acornIconObject.SetActive(false);
+            }
+
+            return;
+        }
+
+        if (acornIconObject == null)
+        {
+            acornIconObject = CreateAcornIconObject();
+        }
+
+        acornIconObject.SetActive(true);
+
+        Image image = acornIconObject.GetComponent<Image>();
+        if (image != null)
+        {
+            image.sprite = GetAcornSprite();
+            image.color = Color.white;
+        }
+
+        RectTransform rectTransform = acornIconObject.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.anchoredPosition = new Vector2(x, IconY + 8f);
+            rectTransform.sizeDelta = new Vector2(34f, 34f);
+        }
+    }
+
+    private GameObject CreateAcornIconObject()
+    {
+        GameObject iconObject = new GameObject("GeneratedLetterQuestHudAcornIcon");
+        iconObject.transform.SetParent(transform, false);
+
+        RectTransform rectTransform = iconObject.AddComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(0f, 1f);
+        rectTransform.pivot = new Vector2(0f, 1f);
+        rectTransform.anchoredPosition = new Vector2(IconStartX + CollectibleIconSpacing, IconY + 8f);
+        rectTransform.sizeDelta = new Vector2(34f, 34f);
+
+        Image image = iconObject.AddComponent<Image>();
+        image.sprite = GetAcornSprite();
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+
+        return iconObject;
+    }
+
+    private void RefreshMushroomIcon(bool shouldShow, float x)
+    {
+        if (!shouldShow)
+        {
+            if (mushroomIconObject != null)
+            {
+                mushroomIconObject.SetActive(false);
+            }
+
+            return;
+        }
+
+        if (mushroomIconObject == null)
+        {
+            mushroomIconObject = CreateMushroomIconObject();
+        }
+
+        mushroomIconObject.SetActive(true);
+
+        Image image = mushroomIconObject.GetComponent<Image>();
+        if (image != null)
+        {
+            image.sprite = GetMushroomSprite();
+            image.color = Color.white;
+        }
+
+        RectTransform rectTransform = mushroomIconObject.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.anchoredPosition = new Vector2(x, IconY + 7f);
+            rectTransform.sizeDelta = new Vector2(36f, 36f);
+        }
+    }
+
+    private GameObject CreateMushroomIconObject()
+    {
+        GameObject iconObject = new GameObject("GeneratedLetterQuestHudMushroomIcon");
+        iconObject.transform.SetParent(transform, false);
+
+        RectTransform rectTransform = iconObject.AddComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(0f, 1f);
+        rectTransform.pivot = new Vector2(0f, 1f);
+        rectTransform.anchoredPosition = new Vector2(IconStartX + CollectibleIconSpacing * 2f, IconY + 7f);
+        rectTransform.sizeDelta = new Vector2(36f, 36f);
+
+        Image image = iconObject.AddComponent<Image>();
+        image.sprite = GetMushroomSprite();
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+
+        return iconObject;
+    }
+
+    private static float GetCollectibleIconX(bool hasCompletedLetter, bool reserveCompletedLetterSlot, int visibleLetterIconCount, int collectibleIndex)
+    {
+        float x = IconStartX;
+        if (visibleLetterIconCount > 0)
+        {
+            x += hasCompletedLetter
+                ? CompletedLetterWaterBottleOffset
+                : FragmentIconSpacing * visibleLetterIconCount;
+        }
+        else if (reserveCompletedLetterSlot)
+        {
+            x += CompletedLetterWaterBottleOffset;
+        }
+
+        return x + CollectibleIconSpacing * collectibleIndex;
+    }
+
+    private static float GetAcornIconX(
+        bool hasWaterBottleIcon,
+        float waterBottleX,
+        bool hasCompletedLetter,
+        bool reserveCompletedLetterSlot,
+        int visibleLetterIconCount)
+    {
+        if (hasWaterBottleIcon)
+        {
+            return waterBottleX + CollectibleIconSpacing;
+        }
+
+        return GetCollectibleIconX(hasCompletedLetter, reserveCompletedLetterSlot, visibleLetterIconCount, 0);
+    }
+
+    private static float GetMushroomIconX(
+        bool hasAcornIcon,
+        float acornX,
+        bool hasWaterBottleIcon,
+        float waterBottleX,
+        bool hasCompletedLetter,
+        bool reserveCompletedLetterSlot,
+        int visibleLetterIconCount)
+    {
+        if (hasAcornIcon)
+        {
+            return acornX + CollectibleIconSpacing;
+        }
+
+        if (hasWaterBottleIcon)
+        {
+            return waterBottleX + CollectibleIconSpacing;
+        }
+
+        return GetCollectibleIconX(hasCompletedLetter, reserveCompletedLetterSlot, visibleLetterIconCount, 0);
     }
 
     private void HideChildrenWithPrefix(string prefix)
@@ -695,6 +946,112 @@ public class LetterQuestHud : MonoBehaviour
         completedLetterSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
         completedLetterSprite.name = "GeneratedCompletedLetterHudSprite";
         return completedLetterSprite;
+    }
+
+    private static Sprite GetWaterBottleSprite()
+    {
+        if (waterBottleSprite != null)
+        {
+            return waterBottleSprite;
+        }
+
+        const int width = 44;
+        const int height = 60;
+        Texture2D texture = CreateClearTexture(width, height);
+        Color outline = new Color32(36, 78, 88, 255);
+        Color glass = new Color32(178, 224, 230, 205);
+        Color water = new Color32(72, 151, 190, 225);
+        Color cork = new Color32(134, 86, 42, 255);
+        Color shine = new Color32(246, 255, 255, 225);
+
+        FillRect(texture, 17, 5, 10, 7, outline);
+        FillRect(texture, 19, 7, 6, 5, cork);
+        FillRect(texture, 14, 12, 16, 5, outline);
+        FillRect(texture, 16, 14, 12, 3, glass);
+        FillRect(texture, 10, 17, 24, 35, outline);
+        FillRect(texture, 13, 20, 18, 29, glass);
+        FillRect(texture, 13, 34, 18, 15, water);
+        FillRect(texture, 16, 23, 3, 14, shine);
+        FillRect(texture, 28, 24, 2, 20, new Color32(106, 175, 200, 185));
+
+        texture.Apply();
+        waterBottleSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+        waterBottleSprite.name = "GeneratedWaterBottleHudSprite";
+        return waterBottleSprite;
+    }
+
+    private static Sprite GetAcornSprite()
+    {
+        if (acornSprite != null)
+        {
+            return acornSprite;
+        }
+
+        const int width = 44;
+        const int height = 44;
+        Texture2D texture = CreateClearTexture(width, height);
+        Color outline = new Color32(63, 42, 24, 255);
+        Color cap = new Color32(113, 72, 35, 255);
+        Color capLight = new Color32(153, 101, 50, 255);
+        Color body = new Color32(172, 103, 43, 255);
+        Color bodyLight = new Color32(207, 136, 62, 255);
+        Color shine = new Color32(232, 174, 92, 210);
+
+        FillRect(texture, 19, 5, 6, 6, outline);
+        FillRect(texture, 21, 3, 3, 6, outline);
+        FillRect(texture, 10, 11, 24, 10, outline);
+        FillRect(texture, 12, 13, 20, 7, cap);
+        FillRect(texture, 14, 13, 5, 2, capLight);
+        FillRect(texture, 23, 14, 6, 2, capLight);
+        FillRect(texture, 8, 18, 28, 8, outline);
+        FillRect(texture, 11, 20, 22, 5, cap);
+        FillRect(texture, 11, 24, 22, 13, outline);
+        FillRect(texture, 14, 25, 16, 10, body);
+        FillRect(texture, 16, 26, 5, 5, bodyLight);
+        FillRect(texture, 22, 28, 3, 5, shine);
+        FillRect(texture, 18, 35, 8, 4, outline);
+        FillRect(texture, 20, 35, 4, 2, body);
+
+        texture.Apply();
+        acornSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+        acornSprite.name = "GeneratedAcornHudSprite";
+        return acornSprite;
+    }
+
+    private static Sprite GetMushroomSprite()
+    {
+        if (mushroomSprite != null)
+        {
+            return mushroomSprite;
+        }
+
+        const int width = 44;
+        const int height = 44;
+        Texture2D texture = CreateClearTexture(width, height);
+        Color outline = new Color32(70, 34, 34, 255);
+        Color cap = new Color32(191, 62, 55, 255);
+        Color capDark = new Color32(139, 43, 45, 255);
+        Color spot = new Color32(255, 230, 190, 255);
+        Color stem = new Color32(235, 205, 158, 255);
+        Color stemShade = new Color32(184, 141, 92, 255);
+
+        FillRect(texture, 10, 13, 24, 5, outline);
+        FillRect(texture, 7, 17, 30, 7, outline);
+        FillRect(texture, 10, 15, 24, 7, cap);
+        FillRect(texture, 12, 21, 20, 5, capDark);
+        FillRect(texture, 15, 15, 4, 3, spot);
+        FillRect(texture, 25, 16, 4, 3, spot);
+        FillRect(texture, 20, 21, 3, 3, spot);
+        FillRect(texture, 16, 24, 13, 14, outline);
+        FillRect(texture, 18, 25, 9, 11, stem);
+        FillRect(texture, 25, 27, 2, 8, stemShade);
+        FillRect(texture, 14, 35, 17, 4, outline);
+        FillRect(texture, 17, 35, 11, 2, stem);
+
+        texture.Apply();
+        mushroomSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+        mushroomSprite.name = "GeneratedMushroomHudSprite";
+        return mushroomSprite;
     }
 
     private static Texture2D CreateClearTexture(int width, int height)

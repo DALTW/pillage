@@ -7,7 +7,10 @@ public enum PencilFragmentSource
     Npc,
     Bird,
     FallenBird,
-    RockCrack
+    RockCrack,
+    Squirrel,
+    LeafPile,
+    HungrySquirrel
 }
 
 public enum LetterFragmentSource
@@ -42,6 +45,12 @@ public static class GameProgress
     public static bool HasCollectedFallenBirdPencilFragment { get; private set; }
     public static bool HasDroppedRockCrackPencilFragment { get; private set; }
     public static bool HasCollectedRockCrackPencilFragment { get; private set; }
+    public static bool HasDroppedSquirrelPencilFragment { get; private set; }
+    public static bool HasCollectedSquirrelPencilFragment { get; private set; }
+    public static bool HasDroppedLeafPilePencilFragment { get; private set; }
+    public static bool HasCollectedLeafPilePencilFragment { get; private set; }
+    public static bool HasDroppedHungrySquirrelPencilFragment { get; private set; }
+    public static bool HasCollectedHungrySquirrelPencilFragment { get; private set; }
     public static bool HasMetQuestNpc { get; private set; }
     public static bool HasCollectedBottleLetterFragment { get; private set; }
     public static bool HasStartedLetterTreeChase { get; private set; }
@@ -60,9 +69,12 @@ public static class GameProgress
     public static bool HasDrawnForestSketch { get; private set; }
     public static bool HasExtendedDeepForestPencil { get; private set; }
     public static bool HasDrawnDeepForestSketch { get; private set; }
+    public static bool HasExtendedFourthForestPencil { get; private set; }
+    public static bool HasDrawnFourthForestSketch { get; private set; }
     public static bool HasColoredVillageGreen { get; private set; }
     public static bool HasColoredForestGreen { get; private set; }
     public static bool HasColoredDeepForestGreen { get; private set; }
+    public static bool HasColoredFourthForestGreen { get; private set; }
     public static bool HasMetForestBird { get; private set; }
     public static bool HasHelpedFallenBird { get; private set; }
     public static bool HasCollectedForestBranch { get; private set; }
@@ -70,15 +82,18 @@ public static class GameProgress
     public static bool HasCollectedBrownCrayon { get; private set; }
     public static bool HasUsedBrownCrayon { get; private set; }
     public static bool HasColoredBrownDetails { get; private set; }
+    public static bool HasCollectedAcorn { get; private set; }
+    public static bool HasCollectedMushroom { get; private set; }
 
     public static bool HasCompletedLetter => AvailableLetterFragmentCount >= RequiredLetterFragmentCount;
     public static bool CanCatchLetterBottle => HasMetQuestNpc && !HasCollectedBottleLetterFragment;
     public static bool CanFindFinalGrassLetterFragment => HasCollectedTreeLetterFragment && !HasCollectedGrassLetterFragment;
-    public static bool HasUncoloredGreenTarget => !HasColoredVillageGreen || (HasDrawnForestSketch && !HasColoredForestGreen) || (HasDrawnDeepForestSketch && !HasColoredDeepForestGreen);
+    public static bool HasUncoloredGreenTarget => !HasColoredVillageGreen || (HasDrawnForestSketch && !HasColoredForestGreen) || (HasDrawnDeepForestSketch && !HasColoredDeepForestGreen) || (HasDrawnFourthForestSketch && !HasColoredFourthForestGreen);
     public static bool CanAddFishingRodInsect => HasUncoloredGreenTarget && FishingRodInsectCount < RequiredFishingRodInsectCount && !HasRevealedGreenCrayon && !HasCollectedGreenCrayon;
     public static bool CanRevealGreenCrayon => HasUncoloredGreenTarget && FishingRodInsectCount >= RequiredFishingRodInsectCount && !HasRevealedGreenCrayon && !HasCollectedGreenCrayon;
     public static bool CanExtendPencilAtSketchbook => AvailablePencilFragmentCount >= 3 && !HasExtendedSketchbookPencil;
     public static bool CanExtendDeepForestAtSketchbook => HasDrawnForestSketch && AvailablePencilFragmentCount >= 3 && !HasExtendedDeepForestPencil;
+    public static bool CanExtendFourthForestAtSketchbook => HasDrawnDeepForestSketch && AvailablePencilFragmentCount >= 3 && !HasExtendedFourthForestPencil;
     public static bool CanColorVillageAtSketchbook => HasCollectedGreenCrayon && HasUncoloredGreenTarget;
     public static bool CanColorBrownDetailsAtSketchbook => HasCollectedBrownCrayon && !HasColoredBrownDetails;
     public static bool HasCompletedMoleHoles => InteractedMoleHoleCount >= RequiredMoleHoleCount;
@@ -109,6 +124,9 @@ public static class GameProgress
             count += HasCollectedBirdPencilFragment ? 1 : 0;
             count += HasCollectedFallenBirdPencilFragment ? 1 : 0;
             count += HasCollectedRockCrackPencilFragment ? 1 : 0;
+            count += HasCollectedSquirrelPencilFragment ? 1 : 0;
+            count += HasCollectedLeafPilePencilFragment ? 1 : 0;
+            count += HasCollectedHungrySquirrelPencilFragment ? 1 : 0;
             return count;
         }
     }
@@ -157,6 +175,12 @@ public static class GameProgress
         HasCollectedFallenBirdPencilFragment = false;
         HasDroppedRockCrackPencilFragment = false;
         HasCollectedRockCrackPencilFragment = false;
+        HasDroppedSquirrelPencilFragment = false;
+        HasCollectedSquirrelPencilFragment = false;
+        HasDroppedLeafPilePencilFragment = false;
+        HasCollectedLeafPilePencilFragment = false;
+        HasDroppedHungrySquirrelPencilFragment = false;
+        HasCollectedHungrySquirrelPencilFragment = false;
         HasMetQuestNpc = false;
         HasCollectedBottleLetterFragment = false;
         HasStartedLetterTreeChase = false;
@@ -175,9 +199,12 @@ public static class GameProgress
         HasDrawnForestSketch = false;
         HasExtendedDeepForestPencil = false;
         HasDrawnDeepForestSketch = false;
+        HasExtendedFourthForestPencil = false;
+        HasDrawnFourthForestSketch = false;
         HasColoredVillageGreen = false;
         HasColoredForestGreen = false;
         HasColoredDeepForestGreen = false;
+        HasColoredFourthForestGreen = false;
         HasMetForestBird = false;
         HasHelpedFallenBird = false;
         HasCollectedForestBranch = false;
@@ -185,6 +212,8 @@ public static class GameProgress
         HasCollectedBrownCrayon = false;
         HasUsedBrownCrayon = false;
         HasColoredBrownDetails = false;
+        HasCollectedAcorn = false;
+        HasCollectedMushroom = false;
 
         for (int i = 0; i < InteractedMoleHoles.Length; i++)
         {
@@ -225,6 +254,16 @@ public static class GameProgress
     public static void CollectWellWaterBottle()
     {
         HasCollectedWellWaterBottle = true;
+    }
+
+    public static void CollectAcorn()
+    {
+        HasCollectedAcorn = true;
+    }
+
+    public static void CollectMushroom()
+    {
+        HasCollectedMushroom = true;
     }
 
     public static bool HasInteractedMoleHole(int holeIndex)
@@ -269,6 +308,12 @@ public static class GameProgress
                 return HasDroppedFallenBirdPencilFragment;
             case PencilFragmentSource.RockCrack:
                 return HasDroppedRockCrackPencilFragment;
+            case PencilFragmentSource.Squirrel:
+                return HasDroppedSquirrelPencilFragment;
+            case PencilFragmentSource.LeafPile:
+                return HasDroppedLeafPilePencilFragment;
+            case PencilFragmentSource.HungrySquirrel:
+                return HasDroppedHungrySquirrelPencilFragment;
             default:
                 return false;
         }
@@ -290,6 +335,12 @@ public static class GameProgress
                 return HasCollectedFallenBirdPencilFragment;
             case PencilFragmentSource.RockCrack:
                 return HasCollectedRockCrackPencilFragment;
+            case PencilFragmentSource.Squirrel:
+                return HasCollectedSquirrelPencilFragment;
+            case PencilFragmentSource.LeafPile:
+                return HasCollectedLeafPilePencilFragment;
+            case PencilFragmentSource.HungrySquirrel:
+                return HasCollectedHungrySquirrelPencilFragment;
             default:
                 return false;
         }
@@ -317,6 +368,15 @@ public static class GameProgress
             case PencilFragmentSource.RockCrack:
                 HasDroppedRockCrackPencilFragment = true;
                 break;
+            case PencilFragmentSource.Squirrel:
+                HasDroppedSquirrelPencilFragment = true;
+                break;
+            case PencilFragmentSource.LeafPile:
+                HasDroppedLeafPilePencilFragment = true;
+                break;
+            case PencilFragmentSource.HungrySquirrel:
+                HasDroppedHungrySquirrelPencilFragment = true;
+                break;
         }
     }
 
@@ -343,6 +403,15 @@ public static class GameProgress
                 break;
             case PencilFragmentSource.RockCrack:
                 HasCollectedRockCrackPencilFragment = true;
+                break;
+            case PencilFragmentSource.Squirrel:
+                HasCollectedSquirrelPencilFragment = true;
+                break;
+            case PencilFragmentSource.LeafPile:
+                HasCollectedLeafPilePencilFragment = true;
+                break;
+            case PencilFragmentSource.HungrySquirrel:
+                HasCollectedHungrySquirrelPencilFragment = true;
                 break;
         }
     }
@@ -498,6 +567,19 @@ public static class GameProgress
         HasColoredDeepForestGreen = HasColoredDeepForestGreen || HasColoredVillageGreen;
     }
 
+    public static void CompleteSketchbookFourthForestDrawing()
+    {
+        if (AvailablePencilFragmentCount < 3 || !HasDrawnDeepForestSketch)
+        {
+            return;
+        }
+
+        UsedPencilFragmentCount = Mathf.Min(CollectedPencilFragmentCount, UsedPencilFragmentCount + 3);
+        HasExtendedFourthForestPencil = true;
+        HasDrawnFourthForestSketch = true;
+        HasColoredFourthForestGreen = HasColoredFourthForestGreen || HasColoredVillageGreen;
+    }
+
     public static void ColorVillageGreen()
     {
         if (!HasCollectedGreenCrayon)
@@ -517,6 +599,10 @@ public static class GameProgress
         if (HasDrawnDeepForestSketch)
         {
             HasColoredDeepForestGreen = true;
+        }
+        if (HasDrawnFourthForestSketch)
+        {
+            HasColoredFourthForestGreen = true;
         }
     }
 
