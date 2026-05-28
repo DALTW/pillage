@@ -9,6 +9,7 @@ public class PencilFragmentHud : MonoBehaviour
     private static Sprite usedIconSprite;
     private static Sprite greenCrayonIconSprite;
     private static Sprite brownCrayonIconSprite;
+    private static Sprite blueCrayonIconSprite;
 
     private const float IconStartX = 18f;
     private const float IconY = -18f;
@@ -17,6 +18,7 @@ public class PencilFragmentHud : MonoBehaviour
     private readonly List<GameObject> iconObjects = new List<GameObject>();
     private GameObject greenCrayonIconObject;
     private GameObject brownCrayonIconObject;
+    private GameObject blueCrayonIconObject;
 
     public static void ShowCollected()
     {
@@ -120,8 +122,14 @@ public class PencilFragmentHud : MonoBehaviour
         }
 
         bool hasBrownCrayonIcon = RefreshBrownCrayonIcon(crayonIconIndex);
+        if (hasBrownCrayonIcon)
+        {
+            crayonIconIndex++;
+        }
 
-        if (collectedCount <= 0 && !hasGreenCrayonIcon && !hasBrownCrayonIcon)
+        bool hasBlueCrayonIcon = RefreshBlueCrayonIcon(crayonIconIndex);
+
+        if (collectedCount <= 0 && !hasGreenCrayonIcon && !hasBrownCrayonIcon && !hasBlueCrayonIcon)
         {
             gameObject.SetActive(false);
         }
@@ -231,6 +239,42 @@ public class PencilFragmentHud : MonoBehaviour
         return true;
     }
 
+    private bool RefreshBlueCrayonIcon(int iconIndex)
+    {
+        bool shouldShow = GameProgress.HasCollectedBlueCrayon || GameProgress.HasUsedBlueCrayon;
+        if (!shouldShow)
+        {
+            if (blueCrayonIconObject != null)
+            {
+                blueCrayonIconObject.SetActive(false);
+            }
+
+            return false;
+        }
+
+        if (blueCrayonIconObject == null)
+        {
+            blueCrayonIconObject = CreateBlueCrayonIconObject();
+        }
+
+        blueCrayonIconObject.SetActive(true);
+
+        Image image = blueCrayonIconObject.GetComponent<Image>();
+        if (image != null)
+        {
+            image.sprite = GetBlueCrayonIconSprite();
+            image.color = Color.white;
+        }
+
+        RectTransform rectTransform = blueCrayonIconObject.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.anchoredPosition = new Vector2(IconStartX + IconSpacing * Mathf.Max(0, iconIndex), IconY);
+        }
+
+        return true;
+    }
+
     private GameObject CreateGreenCrayonIconObject()
     {
         GameObject iconObject = new GameObject("GeneratedGreenCrayonHudIcon");
@@ -265,6 +309,26 @@ public class PencilFragmentHud : MonoBehaviour
 
         Image image = iconObject.AddComponent<Image>();
         image.sprite = GetBrownCrayonIconSprite();
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+
+        return iconObject;
+    }
+
+    private GameObject CreateBlueCrayonIconObject()
+    {
+        GameObject iconObject = new GameObject("GeneratedBlueCrayonHudIcon");
+        iconObject.transform.SetParent(transform, false);
+
+        RectTransform rectTransform = iconObject.AddComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(0f, 1f);
+        rectTransform.pivot = new Vector2(0f, 1f);
+        rectTransform.anchoredPosition = new Vector2(IconStartX, IconY);
+        rectTransform.sizeDelta = new Vector2(74f, 34f);
+
+        Image image = iconObject.AddComponent<Image>();
+        image.sprite = GetBlueCrayonIconSprite();
         image.preserveAspect = true;
         image.raycastTarget = false;
 
@@ -449,6 +513,48 @@ public class PencilFragmentHud : MonoBehaviour
         brownCrayonIconSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
         brownCrayonIconSprite.name = "GeneratedBrownCrayonHudSprite";
         return brownCrayonIconSprite;
+    }
+
+    private static Sprite GetBlueCrayonIconSprite()
+    {
+        if (blueCrayonIconSprite != null)
+        {
+            return blueCrayonIconSprite;
+        }
+
+        const int width = 96;
+        const int height = 44;
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        texture.filterMode = FilterMode.Point;
+
+        Color clear = new Color(0f, 0f, 0f, 0f);
+        Color outline = new Color32(31, 62, 91, 255);
+        Color blue = new Color32(55, 145, 218, 255);
+        Color darkBlue = new Color32(30, 83, 153, 255);
+        Color wrapper = new Color32(180, 223, 248, 255);
+        Color edge = new Color32(35, 102, 176, 255);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                texture.SetPixel(x, y, clear);
+            }
+        }
+
+        FillRect(texture, 8, 14, 62, 15, outline);
+        FillRect(texture, 10, 16, 58, 11, blue);
+        FillRect(texture, 66, 15, 14, 13, outline);
+        FillRect(texture, 66, 18, 10, 7, darkBlue);
+        FillRect(texture, 25, 13, 15, 17, outline);
+        FillRect(texture, 27, 15, 11, 13, wrapper);
+        FillRect(texture, 5, 13, 9, 17, outline);
+        FillRect(texture, 7, 15, 5, 13, edge);
+
+        texture.Apply();
+        blueCrayonIconSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+        blueCrayonIconSprite.name = "GeneratedBlueCrayonHudSprite";
+        return blueCrayonIconSprite;
     }
 
     private static void FillRect(Texture2D texture, int startX, int startY, int width, int height, Color color)

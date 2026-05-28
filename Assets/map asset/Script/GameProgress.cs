@@ -84,6 +84,14 @@ public static class GameProgress
     public static bool HasColoredBrownDetails { get; private set; }
     public static bool HasCollectedAcorn { get; private set; }
     public static bool HasCollectedMushroom { get; private set; }
+    public static bool HasStartedGlowingLeafQuest { get; private set; }
+    public static int ActiveGlowingLeafTreeIndex { get; private set; } = -1;
+    public static bool HasCollectedGlowingLeaf { get; private set; }
+    public static bool HasCollectedBlueCrayon { get; private set; }
+    public static bool HasUsedBlueCrayon { get; private set; }
+    public static bool HasColoredWaterBlue { get; private set; }
+    public static bool HasInspectedFourthForestRiver { get; private set; }
+    public static bool HasBuiltFourthForestRootBridge { get; private set; }
 
     public static bool HasCompletedLetter => AvailableLetterFragmentCount >= RequiredLetterFragmentCount;
     public static bool CanCatchLetterBottle => HasMetQuestNpc && !HasCollectedBottleLetterFragment;
@@ -96,6 +104,7 @@ public static class GameProgress
     public static bool CanExtendFourthForestAtSketchbook => HasDrawnDeepForestSketch && AvailablePencilFragmentCount >= 3 && !HasExtendedFourthForestPencil;
     public static bool CanColorVillageAtSketchbook => HasCollectedGreenCrayon && HasUncoloredGreenTarget;
     public static bool CanColorBrownDetailsAtSketchbook => HasCollectedBrownCrayon && !HasColoredBrownDetails;
+    public static bool CanColorWaterBlueAtSketchbook => HasCollectedBlueCrayon && !HasColoredWaterBlue;
     public static bool HasCompletedMoleHoles => InteractedMoleHoleCount >= RequiredMoleHoleCount;
 
     public static int InteractedMoleHoleCount
@@ -214,6 +223,14 @@ public static class GameProgress
         HasColoredBrownDetails = false;
         HasCollectedAcorn = false;
         HasCollectedMushroom = false;
+        HasStartedGlowingLeafQuest = false;
+        ActiveGlowingLeafTreeIndex = -1;
+        HasCollectedGlowingLeaf = false;
+        HasCollectedBlueCrayon = false;
+        HasUsedBlueCrayon = false;
+        HasColoredWaterBlue = false;
+        HasInspectedFourthForestRiver = false;
+        HasBuiltFourthForestRootBridge = false;
 
         for (int i = 0; i < InteractedMoleHoles.Length; i++)
         {
@@ -264,6 +281,41 @@ public static class GameProgress
     public static void CollectMushroom()
     {
         HasCollectedMushroom = true;
+    }
+
+    public static void StartGlowingLeafQuest(int treeIndex)
+    {
+        if (HasCollectedGlowingLeaf)
+        {
+            return;
+        }
+
+        HasStartedGlowingLeafQuest = true;
+        ActiveGlowingLeafTreeIndex = Mathf.Max(0, treeIndex);
+    }
+
+    public static bool IsGlowingLeafWaitingOnTree(int treeIndex)
+    {
+        return HasStartedGlowingLeafQuest
+            && !HasCollectedGlowingLeaf
+            && ActiveGlowingLeafTreeIndex == treeIndex;
+    }
+
+    public static void CollectGlowingLeaf()
+    {
+        HasStartedGlowingLeafQuest = true;
+        HasCollectedGlowingLeaf = true;
+        ActiveGlowingLeafTreeIndex = -1;
+    }
+
+    public static void CollectBlueCrayon()
+    {
+        if (HasColoredWaterBlue)
+        {
+            return;
+        }
+
+        HasCollectedBlueCrayon = true;
     }
 
     public static bool HasInteractedMoleHole(int holeIndex)
@@ -616,5 +668,38 @@ public static class GameProgress
         HasCollectedBrownCrayon = false;
         HasUsedBrownCrayon = true;
         HasColoredBrownDetails = true;
+    }
+
+    public static void ColorWaterBlue()
+    {
+        if (!CanColorWaterBlueAtSketchbook)
+        {
+            return;
+        }
+
+        HasCollectedBlueCrayon = false;
+        HasUsedBlueCrayon = true;
+        HasColoredWaterBlue = true;
+    }
+
+    public static void InspectFourthForestRiver()
+    {
+        if (!HasColoredWaterBlue || HasBuiltFourthForestRootBridge)
+        {
+            return;
+        }
+
+        HasInspectedFourthForestRiver = true;
+    }
+
+    public static void BuildFourthForestRootBridge()
+    {
+        if (!HasColoredWaterBlue)
+        {
+            return;
+        }
+
+        HasInspectedFourthForestRiver = true;
+        HasBuiltFourthForestRootBridge = true;
     }
 }

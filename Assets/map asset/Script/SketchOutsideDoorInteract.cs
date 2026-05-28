@@ -190,8 +190,10 @@ public class SketchOutsideDoorInteract : MonoBehaviour, IInteractable
         bool shouldGlow = promptVisible
             && (GameProgress.CanExtendPencilAtSketchbook
                 || GameProgress.CanExtendDeepForestAtSketchbook
+                || GameProgress.CanExtendFourthForestAtSketchbook
                 || GameProgress.CanColorVillageAtSketchbook
-                || GameProgress.CanColorBrownDetailsAtSketchbook);
+                || GameProgress.CanColorBrownDetailsAtSketchbook
+                || GameProgress.CanColorWaterBlueAtSketchbook);
 
         if (promptInnerGlowText != null)
         {

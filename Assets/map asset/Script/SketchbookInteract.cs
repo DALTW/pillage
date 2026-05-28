@@ -76,9 +76,10 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         bool shouldPlayFourthForestExpansion = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && GameProgress.CanExtendFourthForestAtSketchbook;
         bool shouldPlayGreenColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && !shouldPlayFourthForestExpansion && GameProgress.CanColorVillageAtSketchbook;
         bool shouldPlayBrownColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && !shouldPlayFourthForestExpansion && !shouldPlayGreenColoring && GameProgress.CanColorBrownDetailsAtSketchbook;
+        bool shouldPlayBlueColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && !shouldPlayFourthForestExpansion && !shouldPlayGreenColoring && !shouldPlayBrownColoring && GameProgress.CanColorWaterBlueAtSketchbook;
         GameProgress.CheckSketchbook();
         isOpen = true;
-        isFirstDrawingLocked = shouldPlayDrawingAnimation || shouldPlayForestExpansion || shouldPlayDeepForestExpansion || shouldPlayFourthForestExpansion || shouldPlayGreenColoring || shouldPlayBrownColoring;
+        isFirstDrawingLocked = shouldPlayDrawingAnimation || shouldPlayForestExpansion || shouldPlayDeepForestExpansion || shouldPlayFourthForestExpansion || shouldPlayGreenColoring || shouldPlayBrownColoring || shouldPlayBlueColoring;
         LockPlayerForFirstDrawing(interactor);
         bigSketchbookUI.SetActive(true);
 
@@ -99,7 +100,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
             }
         }
 
-        scaleRoutine = StartCoroutine(OpenScaleUI(bigSketchbookUI.transform.localScale, shouldPlayDrawingAnimation, shouldPlayForestExpansion, shouldPlayDeepForestExpansion, shouldPlayFourthForestExpansion, shouldPlayGreenColoring, shouldPlayBrownColoring));
+        scaleRoutine = StartCoroutine(OpenScaleUI(bigSketchbookUI.transform.localScale, shouldPlayDrawingAnimation, shouldPlayForestExpansion, shouldPlayDeepForestExpansion, shouldPlayFourthForestExpansion, shouldPlayGreenColoring, shouldPlayBrownColoring, shouldPlayBlueColoring));
     }
 
     private void CloseSketchbook()
@@ -130,7 +131,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         scaleRoutine = StartCoroutine(CloseScaleUI());
     }
 
-    private IEnumerator OpenScaleUI(Vector3 startScale, bool shouldPlayDrawingAnimation, bool shouldPlayForestExpansion, bool shouldPlayDeepForestExpansion, bool shouldPlayFourthForestExpansion, bool shouldPlayGreenColoring, bool shouldPlayBrownColoring)
+    private IEnumerator OpenScaleUI(Vector3 startScale, bool shouldPlayDrawingAnimation, bool shouldPlayForestExpansion, bool shouldPlayDeepForestExpansion, bool shouldPlayFourthForestExpansion, bool shouldPlayGreenColoring, bool shouldPlayBrownColoring, bool shouldPlayBlueColoring)
     {
         yield return ScaleUI(startScale, openScale);
 
@@ -165,6 +166,14 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         else if (isOpen && shouldPlayBrownColoring)
         {
             CompleteBrownColoring();
+        }
+        else if (isOpen && shouldPlayBlueColoring && sketchbookDrawingAnimation != null)
+        {
+            sketchbookDrawingAnimation.PlayBlueWaterColoring(CompleteBlueWaterColoring);
+        }
+        else if (isOpen && shouldPlayBlueColoring)
+        {
+            CompleteBlueWaterColoring();
         }
         else
         {
@@ -262,6 +271,12 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
             SketchOutsideTransition.ApplySketchbookBrownColoring();
         }
 
+        if (GameProgress.HasCollectedBlueCrayon)
+        {
+            GameProgress.ColorWaterBlue();
+            SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
+        }
+
         PencilFragmentHud.RefreshCollected();
         UnlockPlayerAfterFirstDrawing();
     }
@@ -283,6 +298,12 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
             SketchOutsideTransition.ApplySketchbookBrownColoring();
         }
 
+        if (GameProgress.HasCollectedBlueCrayon)
+        {
+            GameProgress.ColorWaterBlue();
+            SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
+        }
+
         PencilFragmentHud.RefreshCollected();
         UnlockPlayerAfterFirstDrawing();
     }
@@ -300,6 +321,14 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         GameProgress.ColorBrownDetails();
         PencilFragmentHud.RefreshCollected();
         SketchOutsideTransition.ApplySketchbookBrownColoring();
+        UnlockPlayerAfterFirstDrawing();
+    }
+
+    private void CompleteBlueWaterColoring()
+    {
+        GameProgress.ColorWaterBlue();
+        PencilFragmentHud.RefreshCollected();
+        SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
         UnlockPlayerAfterFirstDrawing();
     }
 

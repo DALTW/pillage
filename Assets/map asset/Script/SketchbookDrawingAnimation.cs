@@ -16,16 +16,20 @@ public class SketchbookDrawingAnimation : MonoBehaviour
     private const float ForestDrawDuration = 18f;
     private const float GreenCrayonColorDuration = 5.6f;
     private const float BrownCrayonColorDuration = 6.2f;
+    private const float BlueCrayonColorDuration = 5.4f;
     private const float GreenCrayonLengthScale = 0.82f;
     private const float BrownCrayonLengthScale = 0.82f;
+    private const float BlueCrayonLengthScale = 0.82f;
     private const float DeepForestPanelWidthScale = 0.5f;
     private const float SketchbookMapLayoutUnits = 3.5f;
     private const float DefaultSketchbookWidth = 1200f;
+    private const float FirstPageDrawableWidth = 1200f;
     private const float RequestedDrawingHeight = 540f;
     private const float DrawingHorizontalPadding = 28f;
     private const float DrawingVerticalPadding = 42f;
     private static readonly Color GreenCrayonColor = new Color32(74, 166, 73, 235);
     private static readonly Color BrownCrayonColor = new Color32(148, 88, 43, 235);
+    private static readonly Color BlueCrayonColor = new Color32(50, 142, 220, 235);
     private static readonly Vector3[] MiniMapDeepForestTreePlacements =
     {
         new Vector3(-14.0f, 18.2f, 1.02f),
@@ -98,12 +102,16 @@ public class SketchbookDrawingAnimation : MonoBehaviour
     private SketchbookLineDrawingGraphic villageGreenDrawingGraphic;
     private RectTransform villageBrownDrawingRoot;
     private SketchbookLineDrawingGraphic villageBrownDrawingGraphic;
+    private RectTransform villageBlueWaterDrawingRoot;
+    private SketchbookLineDrawingGraphic villageBlueWaterDrawingGraphic;
     private RectTransform forestDrawingRoot;
     private SketchbookLineDrawingGraphic forestDrawingGraphic;
     private RectTransform forestGreenDrawingRoot;
     private SketchbookLineDrawingGraphic forestGreenDrawingGraphic;
     private RectTransform forestBrownDrawingRoot;
     private SketchbookLineDrawingGraphic forestBrownDrawingGraphic;
+    private RectTransform forestBlueWaterDrawingRoot;
+    private SketchbookLineDrawingGraphic forestBlueWaterDrawingGraphic;
     private RectTransform deepForestDrawingRoot;
     private SketchbookLineDrawingGraphic deepForestDrawingGraphic;
     private RectTransform deepForestGreenDrawingRoot;
@@ -116,6 +124,8 @@ public class SketchbookDrawingAnimation : MonoBehaviour
     private SketchbookLineDrawingGraphic fourthForestGreenDrawingGraphic;
     private RectTransform fourthForestBrownDrawingRoot;
     private SketchbookLineDrawingGraphic fourthForestBrownDrawingGraphic;
+    private RectTransform fourthForestBlueWaterDrawingRoot;
+    private SketchbookLineDrawingGraphic fourthForestBlueWaterDrawingGraphic;
     private SketchbookLineDrawingGraphic activeDrawingGraphic;
     private RectTransform pencilRoot;
     private CanvasGroup pencilCanvasGroup;
@@ -126,15 +136,18 @@ public class SketchbookDrawingAnimation : MonoBehaviour
     private float villageDrawingScale = 1f;
     private float villageGreenDrawingScale = 1f;
     private float villageBrownDrawingScale = 1f;
+    private float villageBlueWaterDrawingScale = 1f;
     private float forestDrawingScale = 1f;
     private float forestGreenDrawingScale = 1f;
     private float forestBrownDrawingScale = 1f;
+    private float forestBlueWaterDrawingScale = 1f;
     private float deepForestDrawingScale = 1f;
     private float deepForestGreenDrawingScale = 1f;
     private float deepForestBrownDrawingScale = 1f;
     private float fourthForestDrawingScale = 1f;
     private float fourthForestGreenDrawingScale = 1f;
     private float fourthForestBrownDrawingScale = 1f;
+    private float fourthForestBlueWaterDrawingScale = 1f;
 
     public bool IsPlaying => animationRoutine != null;
 
@@ -232,6 +245,19 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         animationRoutine = StartCoroutine(PlayBrownColoringRoutine());
     }
 
+    public void PlayBlueWaterColoring(Action onComplete = null)
+    {
+        ApplyRequestedAnimationSettings();
+        EnsureSetup();
+        StopAnimation();
+        activeDrawingGraphic = villageBlueWaterDrawingGraphic;
+        activeDrawingScale = villageBlueWaterDrawingScale;
+        pencilStartLengthScale = BlueCrayonLengthScale;
+        pencilEndLengthScale = BlueCrayonLengthScale;
+        animationCompleteCallback = onComplete;
+        animationRoutine = StartCoroutine(PlayBlueWaterColoringRoutine());
+    }
+
     public void ResetDrawing()
     {
         StopAnimation();
@@ -260,6 +286,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
             villageBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails ? 1f : 0f;
         }
 
+        if (villageBlueWaterDrawingGraphic != null)
+        {
+            villageBlueWaterDrawingGraphic.RevealProgress = GameProgress.HasColoredWaterBlue ? 1f : 0f;
+        }
+
         if (forestDrawingGraphic != null)
         {
             forestDrawingGraphic.RevealProgress = GameProgress.HasDrawnForestSketch ? 1f : 0f;
@@ -273,6 +304,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         if (forestBrownDrawingGraphic != null)
         {
             forestBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails && GameProgress.HasDrawnForestSketch ? 1f : 0f;
+        }
+
+        if (forestBlueWaterDrawingGraphic != null)
+        {
+            forestBlueWaterDrawingGraphic.RevealProgress = GameProgress.HasColoredWaterBlue && GameProgress.HasDrawnForestSketch ? 1f : 0f;
         }
 
         if (deepForestDrawingGraphic != null)
@@ -303,6 +339,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         if (fourthForestBrownDrawingGraphic != null)
         {
             fourthForestBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails && GameProgress.HasDrawnFourthForestSketch ? 1f : 0f;
+        }
+
+        if (fourthForestBlueWaterDrawingGraphic != null)
+        {
+            fourthForestBlueWaterDrawingGraphic.RevealProgress = GameProgress.HasColoredWaterBlue && GameProgress.HasDrawnFourthForestSketch ? 1f : 0f;
         }
 
         pencilCanvasGroup.alpha = 0f;
@@ -670,6 +711,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
             villageBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails ? 1f : 0f;
         }
 
+        if (villageBlueWaterDrawingGraphic != null)
+        {
+            villageBlueWaterDrawingGraphic.RevealProgress = GameProgress.HasColoredWaterBlue ? 1f : 0f;
+        }
+
         if (forestDrawingGraphic != null)
         {
             forestDrawingGraphic.RevealProgress = GameProgress.HasDrawnForestSketch ? 1f : 0f;
@@ -683,6 +729,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         if (forestBrownDrawingGraphic != null)
         {
             forestBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails && GameProgress.HasDrawnForestSketch ? 1f : 0f;
+        }
+
+        if (forestBlueWaterDrawingGraphic != null)
+        {
+            forestBlueWaterDrawingGraphic.RevealProgress = GameProgress.HasColoredWaterBlue && GameProgress.HasDrawnForestSketch ? 1f : 0f;
         }
 
         if (deepForestDrawingGraphic != null)
@@ -868,6 +919,120 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         onComplete?.Invoke();
     }
 
+    private IEnumerator PlayBlueWaterColoringRoutine()
+    {
+        drawingGraphic.RevealProgress = 1f;
+        bool shouldColorVillage = !GameProgress.HasColoredWaterBlue;
+        bool shouldColorForest = GameProgress.HasDrawnForestSketch && !GameProgress.HasColoredWaterBlue;
+        bool shouldColorFourthForest = GameProgress.HasDrawnFourthForestSketch && !GameProgress.HasColoredWaterBlue;
+
+        if (villageGreenDrawingGraphic != null)
+        {
+            villageGreenDrawingGraphic.RevealProgress = GameProgress.HasColoredVillageGreen ? 1f : 0f;
+        }
+
+        if (villageBrownDrawingGraphic != null)
+        {
+            villageBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails ? 1f : 0f;
+        }
+
+        if (villageBlueWaterDrawingGraphic != null)
+        {
+            villageBlueWaterDrawingGraphic.RevealProgress = shouldColorVillage ? 0f : 1f;
+        }
+
+        if (forestDrawingGraphic != null)
+        {
+            forestDrawingGraphic.RevealProgress = GameProgress.HasDrawnForestSketch ? 1f : 0f;
+        }
+
+        if (forestGreenDrawingGraphic != null)
+        {
+            forestGreenDrawingGraphic.RevealProgress = GameProgress.HasColoredForestGreen ? 1f : 0f;
+        }
+
+        if (forestBrownDrawingGraphic != null)
+        {
+            forestBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails && GameProgress.HasDrawnForestSketch ? 1f : 0f;
+        }
+
+        if (forestBlueWaterDrawingGraphic != null)
+        {
+            forestBlueWaterDrawingGraphic.RevealProgress = shouldColorForest ? 0f : (GameProgress.HasColoredWaterBlue && GameProgress.HasDrawnForestSketch ? 1f : 0f);
+        }
+
+        if (deepForestDrawingGraphic != null)
+        {
+            deepForestDrawingGraphic.RevealProgress = GameProgress.HasDrawnDeepForestSketch ? 1f : 0f;
+        }
+
+        if (deepForestGreenDrawingGraphic != null)
+        {
+            deepForestGreenDrawingGraphic.RevealProgress = GameProgress.HasColoredDeepForestGreen ? 1f : 0f;
+        }
+
+        if (deepForestBrownDrawingGraphic != null)
+        {
+            deepForestBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails && GameProgress.HasDrawnDeepForestSketch ? 1f : 0f;
+        }
+
+        if (fourthForestDrawingGraphic != null)
+        {
+            fourthForestDrawingGraphic.RevealProgress = GameProgress.HasDrawnFourthForestSketch ? 1f : 0f;
+        }
+
+        if (fourthForestGreenDrawingGraphic != null)
+        {
+            fourthForestGreenDrawingGraphic.RevealProgress = GameProgress.HasColoredFourthForestGreen ? 1f : 0f;
+        }
+
+        if (fourthForestBrownDrawingGraphic != null)
+        {
+            fourthForestBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails && GameProgress.HasDrawnFourthForestSketch ? 1f : 0f;
+        }
+
+        if (fourthForestBlueWaterDrawingGraphic != null)
+        {
+            fourthForestBlueWaterDrawingGraphic.RevealProgress = shouldColorFourthForest ? 0f : (GameProgress.HasColoredWaterBlue && GameProgress.HasDrawnFourthForestSketch ? 1f : 0f);
+        }
+
+        if (shouldColorVillage && villageBlueWaterDrawingGraphic != null)
+        {
+            yield return PlayBlueColoringOnTarget(
+                villageBlueWaterDrawingGraphic,
+                drawingRoot,
+                villageBlueWaterDrawingScale);
+        }
+
+        if (shouldColorForest && forestBlueWaterDrawingGraphic != null)
+        {
+            yield return PlayBlueColoringOnTarget(
+                forestBlueWaterDrawingGraphic,
+                forestDrawingRoot,
+                forestBlueWaterDrawingScale);
+        }
+
+        if (shouldColorFourthForest && fourthForestBlueWaterDrawingGraphic != null)
+        {
+            yield return PlayBlueColoringOnTarget(
+                fourthForestBlueWaterDrawingGraphic,
+                fourthForestDrawingRoot,
+                fourthForestBlueWaterDrawingScale);
+        }
+
+        if (pencilExitDuration > 0f)
+        {
+            yield return MovePencilOut();
+        }
+
+        SetPencilTint(Color.white);
+        pencilRoot.gameObject.SetActive(false);
+        animationRoutine = null;
+        Action onComplete = animationCompleteCallback;
+        animationCompleteCallback = null;
+        onComplete?.Invoke();
+    }
+
     private IEnumerator PlayGreenColoringOnTarget(SketchbookLineDrawingGraphic greenDrawingGraphic, RectTransform targetRoot, float targetScale)
     {
         if (greenDrawingGraphic == null || targetRoot == null)
@@ -937,6 +1102,42 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         }
 
         brownDrawingGraphic.RevealProgress = 1f;
+        SetPencilAtProgress(1f);
+    }
+
+    private IEnumerator PlayBlueColoringOnTarget(SketchbookLineDrawingGraphic blueDrawingGraphic, RectTransform targetRoot, float targetScale)
+    {
+        if (blueDrawingGraphic == null || targetRoot == null)
+        {
+            yield break;
+        }
+
+        activeDrawingGraphic = blueDrawingGraphic;
+        activeDrawingScale = targetScale;
+        pencilStartLengthScale = BlueCrayonLengthScale;
+        pencilEndLengthScale = BlueCrayonLengthScale;
+        SetPencilParent(targetRoot);
+        SetPencilTint(BlueCrayonColor);
+        pencilCanvasGroup.alpha = 1f;
+        pencilRoot.gameObject.SetActive(true);
+        SetPencilLengthScale(BlueCrayonLengthScale);
+        SetPencilAtProgress(0f);
+
+        float elapsed = 0f;
+        float revealProgress = 0f;
+
+        while (elapsed < BlueCrayonColorDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / BlueCrayonColorDuration);
+            revealProgress = Mathf.Max(revealProgress, ApplyCrayonColoringPace(progress));
+
+            blueDrawingGraphic.RevealProgress = revealProgress;
+            SetPencilAtProgress(revealProgress, elapsed, true);
+            yield return null;
+        }
+
+        blueDrawingGraphic.RevealProgress = 1f;
         SetPencilAtProgress(1f);
     }
 
@@ -1108,6 +1309,23 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         villageBrownDrawingScale = FitStrokesToReferenceRoot(villageBrownStrokes, drawingRoot, BuildSketchbookStrokes());
         villageBrownDrawingGraphic.SetStrokes(villageBrownStrokes);
 
+        villageBlueWaterDrawingRoot = villageBlueWaterDrawingRoot != null ? villageBlueWaterDrawingRoot : CreateVillageBlueWaterDrawingRoot();
+        ConfigureOverlayDrawingRoot(villageBlueWaterDrawingRoot, drawingRoot);
+
+        villageBlueWaterDrawingGraphic = villageBlueWaterDrawingRoot.GetComponent<SketchbookLineDrawingGraphic>();
+        if (villageBlueWaterDrawingGraphic == null)
+        {
+            villageBlueWaterDrawingGraphic = villageBlueWaterDrawingRoot.gameObject.AddComponent<SketchbookLineDrawingGraphic>();
+        }
+
+        villageBlueWaterDrawingGraphic.raycastTarget = false;
+        villageBlueWaterDrawingGraphic.color = BlueCrayonColor;
+        villageBlueWaterDrawingGraphic.LineWidth = lineWidth * 2.12f;
+
+        List<Vector2[]> villageBlueWaterStrokes = BuildSketchbookVillageBlueWaterColorStrokes();
+        villageBlueWaterDrawingScale = FitStrokesToReferenceRoot(villageBlueWaterStrokes, drawingRoot, BuildSketchbookStrokes());
+        villageBlueWaterDrawingGraphic.SetStrokes(villageBlueWaterStrokes);
+
         forestDrawingRoot = forestDrawingRoot != null ? forestDrawingRoot : CreateForestDrawingRoot();
         ConfigureMapDrawingRoot(forestDrawingRoot, 1f, 1f);
 
@@ -1158,6 +1376,23 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         List<Vector2[]> forestBrownStrokes = BuildSketchbookForestBrownColorStrokes();
         forestBrownDrawingScale = FitStrokesToReferenceRoot(forestBrownStrokes, forestDrawingRoot, BuildSketchbookForestStrokes());
         forestBrownDrawingGraphic.SetStrokes(forestBrownStrokes);
+
+        forestBlueWaterDrawingRoot = forestBlueWaterDrawingRoot != null ? forestBlueWaterDrawingRoot : CreateForestBlueWaterDrawingRoot();
+        ConfigureOverlayDrawingRoot(forestBlueWaterDrawingRoot, forestDrawingRoot);
+
+        forestBlueWaterDrawingGraphic = forestBlueWaterDrawingRoot.GetComponent<SketchbookLineDrawingGraphic>();
+        if (forestBlueWaterDrawingGraphic == null)
+        {
+            forestBlueWaterDrawingGraphic = forestBlueWaterDrawingRoot.gameObject.AddComponent<SketchbookLineDrawingGraphic>();
+        }
+
+        forestBlueWaterDrawingGraphic.raycastTarget = false;
+        forestBlueWaterDrawingGraphic.color = BlueCrayonColor;
+        forestBlueWaterDrawingGraphic.LineWidth = lineWidth * 2.0f;
+
+        List<Vector2[]> forestBlueWaterStrokes = BuildSketchbookForestBlueWaterColorStrokes();
+        forestBlueWaterDrawingScale = FitStrokesToReferenceRoot(forestBlueWaterStrokes, forestDrawingRoot, BuildSketchbookForestStrokes());
+        forestBlueWaterDrawingGraphic.SetStrokes(forestBlueWaterStrokes);
 
         deepForestDrawingRoot = deepForestDrawingRoot != null ? deepForestDrawingRoot : CreateDeepForestDrawingRoot();
         ConfigureMapDrawingRoot(deepForestDrawingRoot, 2f, DeepForestPanelWidthScale);
@@ -1261,6 +1496,23 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         fourthForestBrownDrawingScale = FitStrokesToReferenceRoot(fourthForestBrownStrokes, fourthForestDrawingRoot, BuildSketchbookFourthForestStrokes());
         fourthForestBrownDrawingGraphic.SetStrokes(fourthForestBrownStrokes);
 
+        fourthForestBlueWaterDrawingRoot = fourthForestBlueWaterDrawingRoot != null ? fourthForestBlueWaterDrawingRoot : CreateFourthForestBlueWaterDrawingRoot();
+        ConfigureOverlayDrawingRoot(fourthForestBlueWaterDrawingRoot, fourthForestDrawingRoot);
+
+        fourthForestBlueWaterDrawingGraphic = fourthForestBlueWaterDrawingRoot.GetComponent<SketchbookLineDrawingGraphic>();
+        if (fourthForestBlueWaterDrawingGraphic == null)
+        {
+            fourthForestBlueWaterDrawingGraphic = fourthForestBlueWaterDrawingRoot.gameObject.AddComponent<SketchbookLineDrawingGraphic>();
+        }
+
+        fourthForestBlueWaterDrawingGraphic.raycastTarget = false;
+        fourthForestBlueWaterDrawingGraphic.color = BlueCrayonColor;
+        fourthForestBlueWaterDrawingGraphic.LineWidth = lineWidth * 2.18f;
+
+        List<Vector2[]> fourthForestBlueWaterStrokes = BuildSketchbookFourthForestBlueWaterColorStrokes();
+        fourthForestBlueWaterDrawingScale = FitStrokesToReferenceRoot(fourthForestBlueWaterStrokes, fourthForestDrawingRoot, BuildSketchbookFourthForestStrokes());
+        fourthForestBlueWaterDrawingGraphic.SetStrokes(fourthForestBlueWaterStrokes);
+
         pencilRoot = CreateOrFindPencilRoot();
         pencilCanvasGroup = pencilRoot.GetComponent<CanvasGroup>();
         if (pencilCanvasGroup == null)
@@ -1312,6 +1564,19 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         return drawingObject.GetComponent<RectTransform>();
     }
 
+    private RectTransform CreateVillageBlueWaterDrawingRoot()
+    {
+        Transform existing = transform.Find("GeneratedSketchVillageBlueWaterDrawing");
+        if (existing != null)
+        {
+            return existing as RectTransform;
+        }
+
+        GameObject drawingObject = new GameObject("GeneratedSketchVillageBlueWaterDrawing", typeof(RectTransform));
+        drawingObject.transform.SetParent(transform, false);
+        return drawingObject.GetComponent<RectTransform>();
+    }
+
     private RectTransform CreateForestDrawingRoot()
     {
         Transform existing = transform.Find("GeneratedSketchForestDrawing");
@@ -1347,6 +1612,19 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         }
 
         GameObject drawingObject = new GameObject("GeneratedSketchForestBrownDrawing", typeof(RectTransform));
+        drawingObject.transform.SetParent(transform, false);
+        return drawingObject.GetComponent<RectTransform>();
+    }
+
+    private RectTransform CreateForestBlueWaterDrawingRoot()
+    {
+        Transform existing = transform.Find("GeneratedSketchForestBlueWaterDrawing");
+        if (existing != null)
+        {
+            return existing as RectTransform;
+        }
+
+        GameObject drawingObject = new GameObject("GeneratedSketchForestBlueWaterDrawing", typeof(RectTransform));
         drawingObject.transform.SetParent(transform, false);
         return drawingObject.GetComponent<RectTransform>();
     }
@@ -1429,6 +1707,19 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         return drawingObject.GetComponent<RectTransform>();
     }
 
+    private RectTransform CreateFourthForestBlueWaterDrawingRoot()
+    {
+        Transform existing = transform.Find("GeneratedSketchFourthForestBlueWaterDrawing");
+        if (existing != null)
+        {
+            return existing as RectTransform;
+        }
+
+        GameObject drawingObject = new GameObject("GeneratedSketchFourthForestBlueWaterDrawing", typeof(RectTransform));
+        drawingObject.transform.SetParent(transform, false);
+        return drawingObject.GetComponent<RectTransform>();
+    }
+
     private void ConfigureMapDrawingRoot(RectTransform targetRoot, float unitStart, float unitWidth)
     {
         if (targetRoot == null)
@@ -1483,6 +1774,10 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         {
             existing = villageBrownDrawingRoot.Find("GeneratedPencil");
         }
+        if (existing == null && villageBlueWaterDrawingRoot != null)
+        {
+            existing = villageBlueWaterDrawingRoot.Find("GeneratedPencil");
+        }
         if (existing == null && forestDrawingRoot != null)
         {
             existing = forestDrawingRoot.Find("GeneratedPencil");
@@ -1494,6 +1789,10 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         if (existing == null && forestBrownDrawingRoot != null)
         {
             existing = forestBrownDrawingRoot.Find("GeneratedPencil");
+        }
+        if (existing == null && forestBlueWaterDrawingRoot != null)
+        {
+            existing = forestBlueWaterDrawingRoot.Find("GeneratedPencil");
         }
         if (existing == null && deepForestDrawingRoot != null)
         {
@@ -1518,6 +1817,10 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         if (existing == null && fourthForestBrownDrawingRoot != null)
         {
             existing = fourthForestBrownDrawingRoot.Find("GeneratedPencil");
+        }
+        if (existing == null && fourthForestBlueWaterDrawingRoot != null)
+        {
+            existing = fourthForestBlueWaterDrawingRoot.Find("GeneratedPencil");
         }
 
         RectTransform root = existing as RectTransform;
@@ -1583,6 +1886,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
             villageBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails ? 1f : 0f;
         }
 
+        if (villageBlueWaterDrawingGraphic != null)
+        {
+            villageBlueWaterDrawingGraphic.RevealProgress = GameProgress.HasColoredWaterBlue ? 1f : 0f;
+        }
+
         if (forestDrawingGraphic != null)
         {
             forestDrawingGraphic.RevealProgress = GameProgress.HasDrawnForestSketch ? 1f : 0f;
@@ -1596,6 +1904,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         if (forestBrownDrawingGraphic != null)
         {
             forestBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails && GameProgress.HasDrawnForestSketch ? 1f : 0f;
+        }
+
+        if (forestBlueWaterDrawingGraphic != null)
+        {
+            forestBlueWaterDrawingGraphic.RevealProgress = GameProgress.HasColoredWaterBlue && GameProgress.HasDrawnForestSketch ? 1f : 0f;
         }
 
         if (deepForestDrawingGraphic != null)
@@ -1626,6 +1939,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         if (fourthForestBrownDrawingGraphic != null)
         {
             fourthForestBrownDrawingGraphic.RevealProgress = GameProgress.HasColoredBrownDetails && GameProgress.HasDrawnFourthForestSketch ? 1f : 0f;
+        }
+
+        if (fourthForestBlueWaterDrawingGraphic != null)
+        {
+            fourthForestBlueWaterDrawingGraphic.RevealProgress = GameProgress.HasColoredWaterBlue && GameProgress.HasDrawnFourthForestSketch ? 1f : 0f;
         }
 
         if (targetDrawing == null || pencilRoot == null || pencilCanvasGroup == null)
@@ -1930,7 +2248,8 @@ public class SketchbookDrawingAnimation : MonoBehaviour
 
     private float GetSketchbookLayoutWidth()
     {
-        return Mathf.Max(1f, GetSketchbookWidth() - DrawingHorizontalPadding * 2f - Mathf.Abs(drawingOffset.x) * 2f);
+        float drawableWidth = Mathf.Min(GetSketchbookWidth(), FirstPageDrawableWidth);
+        return Mathf.Max(1f, drawableWidth - DrawingHorizontalPadding * 2f - Mathf.Abs(drawingOffset.x) * 2f);
     }
 
     private float GetSketchbookLayoutHeight()
@@ -2035,6 +2354,15 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         return strokes;
     }
 
+    private static List<Vector2[]> BuildSketchbookVillageBlueWaterColorStrokes()
+    {
+        List<Vector2[]> strokes = new List<Vector2[]>();
+
+        AddMiniMapPondBlueWater(strokes, -23.5f, -13.6f);
+
+        return strokes;
+    }
+
     private static void AddMiniMapForestEntranceGreenColor(List<Vector2[]> strokes, float centerX, float centerY)
     {
         AddMiniMapPineCrayon(strokes, centerX - 1.8f, centerY - 1.1f, 0.95f);
@@ -2107,6 +2435,15 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         return strokes;
     }
 
+    private static List<Vector2[]> BuildSketchbookForestBlueWaterColorStrokes()
+    {
+        List<Vector2[]> strokes = new List<Vector2[]>();
+
+        AddMiniMapWellBlueWater(strokes, 10.6f, -7.8f, 0.86f);
+
+        return strokes;
+    }
+
     private static List<Vector2[]> BuildSketchbookDeepForestStrokes()
     {
         List<Vector2[]> strokes = new List<Vector2[]>();
@@ -2170,6 +2507,15 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         AddMiniMapFourthForestConnectionPath(strokes);
         AddMiniMapFourthForestBigTreeTrunkBrownColor(strokes);
         AddMiniMapFourthForestTreeTrunkBrownColor(strokes);
+
+        return strokes;
+    }
+
+    private static List<Vector2[]> BuildSketchbookFourthForestBlueWaterColorStrokes()
+    {
+        List<Vector2[]> strokes = new List<Vector2[]>();
+
+        AddMiniMapFourthForestRiverBlueWater(strokes, 26.6f, -15.2f);
 
         return strokes;
     }
@@ -2687,6 +3033,14 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         strokes.Add(MapPoints(centerX + 4.55f, centerY + 1.05f, centerX + 5.0f, centerY + 0.55f));
     }
 
+    private static void AddMiniMapPondBlueWater(List<Vector2[]> strokes, float centerX, float centerY)
+    {
+        strokes.Add(MapEllipsePoints(centerX + 0.1f, centerY, 4.35f, 1.95f, 28));
+        strokes.Add(MapPoints(centerX - 3.25f, centerY + 0.62f, centerX - 2.0f, centerY + 0.86f, centerX - 0.7f, centerY + 0.58f, centerX + 0.65f, centerY + 0.82f, centerX + 2.12f, centerY + 0.52f));
+        strokes.Add(MapPoints(centerX - 3.7f, centerY - 0.16f, centerX - 2.38f, centerY + 0.08f, centerX - 1.05f, centerY - 0.2f, centerX + 0.22f, centerY + 0.04f, centerX + 1.6f, centerY - 0.18f, centerX + 3.05f, centerY + 0.05f));
+        strokes.Add(MapPoints(centerX - 2.78f, centerY - 0.95f, centerX - 1.36f, centerY - 0.68f, centerX + 0.08f, centerY - 0.96f, centerX + 1.48f, centerY - 0.7f, centerX + 2.8f, centerY - 0.92f));
+    }
+
     private static void AddMiniMapMailbox(List<Vector2[]> strokes, float centerX, float centerY)
     {
         strokes.Add(MapPoints(centerX, centerY - 0.8f, centerX, centerY + 0.25f));
@@ -2783,6 +3137,35 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         strokes.Add(MapLocalPoints(centerX, centerY, scale, -1.14f, 1.72f, -0.56f, 2.34f, 0f, 2.58f, 0.58f, 2.34f, 1.14f, 1.72f));
         strokes.Add(MapLocalPoints(centerX, centerY, scale, -0.54f, 1.2f, 0.54f, 1.2f));
         strokes.Add(MapLocalPoints(centerX, centerY, scale, 0f, 1.2f, 0f, 0.28f));
+    }
+
+    private static void AddMiniMapWellBlueWater(List<Vector2[]> strokes, float centerX, float centerY, float scale)
+    {
+        strokes.Add(MapEllipsePoints(centerX, centerY + 0.36f * scale, 0.92f * scale, 0.2f * scale, 18));
+        strokes.Add(MapLocalPoints(centerX, centerY, scale, -0.68f, 0.38f, -0.34f, 0.48f, 0.02f, 0.36f, 0.36f, 0.48f, 0.72f, 0.36f));
+        strokes.Add(MapLocalPoints(centerX, centerY, scale, -0.48f, 0.18f, -0.12f, 0.08f, 0.24f, 0.18f, 0.52f, 0.08f));
+    }
+
+    private static void AddMiniMapFourthForestRiverBlueWater(List<Vector2[]> strokes, float centerX, float centerY)
+    {
+        strokes.Add(MapEllipsePoints(centerX, centerY, 7.05f, 5.58f, 42));
+        strokes.Add(MapEllipsePoints(centerX - 0.08f, centerY - 0.04f, 3.36f, 2.54f, 32));
+        strokes.Add(MapPoints(centerX - 5.65f, centerY + 2.62f, centerX - 4.42f, centerY + 3.06f, centerX - 3.12f, centerY + 2.68f, centerX - 1.86f, centerY + 3.02f, centerX - 0.48f, centerY + 2.66f));
+        strokes.Add(MapPoints(centerX + 1.02f, centerY + 3.02f, centerX + 2.34f, centerY + 2.62f, centerX + 3.82f, centerY + 3.04f, centerX + 5.34f, centerY + 2.56f));
+        strokes.Add(MapPoints(centerX - 5.86f, centerY - 2.62f, centerX - 4.46f, centerY - 2.18f, centerX - 3.1f, centerY - 2.58f, centerX - 1.82f, centerY - 2.24f, centerX - 0.5f, centerY - 2.64f));
+        strokes.Add(MapPoints(centerX + 0.92f, centerY - 2.18f, centerX + 2.18f, centerY - 2.62f, centerX + 3.56f, centerY - 2.22f, centerX + 5.2f, centerY - 2.72f));
+        strokes.Add(MapPoints(centerX - 6.12f, centerY + 0.92f, centerX - 5.42f, centerY + 0.38f, centerX - 6.04f, centerY - 0.22f, centerX - 5.28f, centerY - 0.82f));
+        strokes.Add(MapPoints(centerX + 5.78f, centerY + 0.96f, centerX + 6.28f, centerY + 0.36f, centerX + 5.64f, centerY - 0.18f, centerX + 6.16f, centerY - 0.82f));
+        AddMiniMapFourthForestIslandDoor(strokes, centerX, centerY, 0.7f);
+    }
+
+    private static void AddMiniMapFourthForestIslandDoor(List<Vector2[]> strokes, float centerX, float centerY, float scale)
+    {
+        strokes.Add(MapLocalPoints(centerX, centerY, scale, -1.24f, -1.72f, -1.24f, 0.52f, -1.02f, 1.1f, -0.56f, 1.58f, 0f, 1.78f, 0.58f, 1.58f, 1.02f, 1.1f, 1.24f, 0.52f, 1.24f, -1.72f, -1.24f, -1.72f));
+        strokes.Add(MapLocalPoints(centerX, centerY, scale, -0.78f, -1.72f, -0.78f, 0.36f, -0.54f, 0.92f, 0f, 1.18f, 0.54f, 0.92f, 0.78f, 0.36f, 0.78f, -1.72f));
+        strokes.Add(MapLocalPoints(centerX, centerY, scale, 0f, -1.62f, 0f, 1.12f));
+        strokes.Add(MapEllipsePoints(centerX + 0.42f * scale, centerY - 0.18f * scale, 0.11f * scale, 0.09f * scale, 10));
+        strokes.Add(MapLocalPoints(centerX, centerY, scale, -1.44f, -1.78f, 1.44f, -1.78f));
     }
 
     private static void AddMiniMapRock(List<Vector2[]> strokes, float centerX, float centerY, float scale)

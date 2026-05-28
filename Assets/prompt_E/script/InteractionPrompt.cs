@@ -189,8 +189,10 @@ public class InteractionPrompt : MonoBehaviour
         bool shouldGlow = promptVisible
             && (GameProgress.CanExtendPencilAtSketchbook
                 || GameProgress.CanExtendDeepForestAtSketchbook
+                || GameProgress.CanExtendFourthForestAtSketchbook
                 || GameProgress.CanColorVillageAtSketchbook
-                || GameProgress.CanColorBrownDetailsAtSketchbook);
+                || GameProgress.CanColorBrownDetailsAtSketchbook
+                || GameProgress.CanColorWaterBlueAtSketchbook);
 
         if (promptInnerGlowText != null)
         {
