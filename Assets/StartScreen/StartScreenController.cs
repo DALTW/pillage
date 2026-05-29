@@ -18,11 +18,12 @@ public class StartScreenController : MonoBehaviour
     private CanvasGroup startButtonGroup;
     private RectTransform canvasRoot;
     private HandwrittenTextGraphic titleGraphic;
+    private HandwrittenTextGraphic gameGraphic;
     private HandwrittenTextGraphic startGraphic;
     private RectTransform titleDrawCursor;
+    private RectTransform gameDrawCursor;
     private RectTransform startDrawCursor;
-    private RectTransform startUnderline;
-    private float startUnderlineWidth;
+    private readonly List<SketchStroke> startArrowStrokes = new List<SketchStroke>();
     private bool isLoading;
 
     private void Awake()
@@ -79,10 +80,10 @@ public class StartScreenController : MonoBehaviour
 
         CreateBackground(canvasRect);
 
-        CanvasGroup titleGroup = CreateCanvasGroup("TitleGroup", canvasRect, new Vector2(0.5f, 0.5f), new Vector2(0f, 92f), new Vector2(980f, 180f));
-        titleGraphic = CreateHandwrittenText("Title", titleGroup.GetComponent<RectTransform>(), titleText, 17f, out titleDrawCursor);
+        CanvasGroup titleGroup = CreateCanvasGroup("TitleGroup", canvasRect, new Vector2(0.5f, 0.5f), new Vector2(8f, 236f), new Vector2(1510f, 270f));
+        titleGraphic = CreateHandwrittenText("Title", titleGroup.GetComponent<RectTransform>(), titleText, 21f, out titleDrawCursor);
 
-        startButtonGroup = CreateCanvasGroup("StartButton", canvasRect, new Vector2(0.5f, 0.5f), new Vector2(0f, -104f), new Vector2(430f, 86f));
+        startButtonGroup = CreateCanvasGroup("StartButton", canvasRect, new Vector2(0.79f, 0.285f), Vector2.zero, new Vector2(610f, 310f));
         Image buttonImage = startButtonGroup.gameObject.AddComponent<Image>();
         buttonImage.sprite = CreateSolidSprite(16, 16, new Color(1f, 1f, 1f, 0.002f));
 
@@ -91,11 +92,18 @@ public class StartScreenController : MonoBehaviour
         startButton.onClick.AddListener(StartGame);
         startButton.interactable = false;
 
-        startGraphic = CreateHandwrittenText("StartText", startButtonGroup.GetComponent<RectTransform>(), startButtonText, 7f, out startDrawCursor);
-        RectTransform underline = CreateImage("StartUnderline", startButtonGroup.GetComponent<RectTransform>(), CreateSolidSprite(16, 16, new Color(0f, 0f, 0f, 0.82f)), Color.white);
-        startUnderlineWidth = 258f;
-        startUnderline = underline;
-        SetRect(underline, new Vector2(0.5f, 0.5f), new Vector2(0f, -33f), new Vector2(0f, 3f));
+        string firstStartWord;
+        string secondStartWord;
+        SplitStartButtonText(out firstStartWord, out secondStartWord);
+
+        RectTransform startButtonRect = startButtonGroup.GetComponent<RectTransform>();
+        RectTransform gameTextRect = CreateRectTransform("GameTextLine", startButtonRect, new Vector2(0.5f, 0.5f), new Vector2(88f, 66f), new Vector2(360f, 112f));
+        gameGraphic = CreateHandwrittenText("GameText", gameTextRect, firstStartWord, 10f, out gameDrawCursor);
+
+        RectTransform startTextRect = CreateRectTransform("StartTextLine", startButtonRect, new Vector2(0.5f, 0.5f), new Vector2(136f, -72f), new Vector2(430f, 118f));
+        startGraphic = CreateHandwrittenText("StartText", startTextRect, secondStartWord, 10f, out startDrawCursor);
+
+        CreateStartArrow(startButtonRect);
 
         titleGroup.alpha = 1f;
         startButtonGroup.alpha = 0f;
@@ -150,20 +158,14 @@ public class StartScreenController : MonoBehaviour
 
     private void CreateBackground(RectTransform parent)
     {
-        RectTransform background = CreateImage("WornWhiteBackground", parent, CreateWornPaperSprite(768, 432), Color.white);
+        RectTransform background = CreateImage("WhitePaperBackground", parent, CreateWornPaperSprite(768, 432), Color.white);
         Stretch(background);
 
-        CreateColorWash(parent, "GreenWash", new Vector2(0f, 0f), new Vector2(0.33333334f, 1f), new Color(0.48f, 0.78f, 0.43f, 0.27f));
-        CreateColorWash(parent, "SkyWash", new Vector2(0.33333334f, 0f), new Vector2(0.6666667f, 1f), new Color(0.48f, 0.77f, 0.92f, 0.25f));
-        CreateColorWash(parent, "BrownWash", new Vector2(0.6666667f, 0f), new Vector2(1f, 1f), new Color(0.58f, 0.42f, 0.25f, 0.22f));
-
-        CreateWearLine(parent, new Vector2(0.16f, 0.78f), new Vector2(-40f, 0f), new Vector2(420f, 2f), -2f, 0.12f);
-        CreateWearLine(parent, new Vector2(0.81f, 0.68f), new Vector2(20f, 0f), new Vector2(360f, 2f), 3f, 0.09f);
-        CreateWearLine(parent, new Vector2(0.25f, 0.22f), new Vector2(0f, 0f), new Vector2(310f, 2f), 1.5f, 0.1f);
-        CreateWearLine(parent, new Vector2(0.72f, 0.28f), new Vector2(0f, 0f), new Vector2(470f, 2f), -1f, 0.08f);
-        CreateWearStain(parent, new Vector2(0.18f, 0.32f), new Vector2(180f, 118f), 0.055f);
-        CreateWearStain(parent, new Vector2(0.78f, 0.76f), new Vector2(220f, 145f), 0.045f);
-        CreateWearStain(parent, new Vector2(0.62f, 0.18f), new Vector2(150f, 92f), 0.04f);
+        CreateWearLine(parent, new Vector2(0.16f, 0.78f), new Vector2(-40f, 0f), new Vector2(420f, 2f), -2f, 0.035f);
+        CreateWearLine(parent, new Vector2(0.81f, 0.68f), new Vector2(20f, 0f), new Vector2(360f, 2f), 3f, 0.03f);
+        CreateWearStain(parent, new Vector2(0.18f, 0.32f), new Vector2(180f, 118f), 0.018f);
+        CreateWearStain(parent, new Vector2(0.78f, 0.76f), new Vector2(220f, 145f), 0.015f);
+        CreateBackgroundDoodles(parent);
     }
 
     private void CreateColorWash(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Color color)
@@ -207,6 +209,108 @@ public class StartScreenController : MonoBehaviour
     {
         RectTransform stain = CreateImage("PaperStain", parent, CreateStainSprite(96, new Color(0.38f, 0.31f, 0.18f, alpha)), Color.white);
         SetRect(stain, anchor, Vector2.zero, size);
+    }
+
+    private void CreateBackgroundDoodles(RectTransform parent)
+    {
+        CreateTreeDoodle(parent, "DoodleTreeLeftBottom", new Vector2(0.11f, 0.23f), Vector2.zero, 0.92f, -7f, 0.46f);
+        CreateTreeDoodle(parent, "DoodleTreeRightTop", new Vector2(0.91f, 0.72f), Vector2.zero, 0.74f, 8f, 0.4f);
+        CreateTreeDoodle(parent, "DoodleTreeLowerMid", new Vector2(0.37f, 0.19f), Vector2.zero, 0.58f, 4f, 0.34f);
+
+        CreateFishDoodle(parent, "DoodleFishLeft", new Vector2(0.22f, 0.46f), Vector2.zero, 0.74f, -8f, 0.42f);
+        CreateFishDoodle(parent, "DoodleFishLower", new Vector2(0.53f, 0.18f), Vector2.zero, 0.68f, 11f, 0.38f);
+        CreateFishDoodle(parent, "DoodleFishRight", new Vector2(0.9f, 0.48f), Vector2.zero, 0.62f, 5f, 0.36f);
+        CreateFishDoodle(parent, "DoodleFishUpperLeft", new Vector2(0.13f, 0.7f), Vector2.zero, 0.52f, -14f, 0.3f);
+    }
+
+    private RectTransform CreateDoodleRoot(RectTransform parent, string name, Vector2 anchor, Vector2 position, Vector2 size, float scale, float rotation, float alpha)
+    {
+        RectTransform root = CreateRectTransform(name, parent, anchor, position, size);
+        root.localScale = Vector3.one * scale;
+        root.localRotation = Quaternion.Euler(0f, 0f, rotation);
+
+        CanvasGroup group = root.gameObject.AddComponent<CanvasGroup>();
+        group.alpha = alpha;
+        group.blocksRaycasts = false;
+        group.interactable = false;
+
+        return root;
+    }
+
+    private void CreateTreeDoodle(RectTransform parent, string name, Vector2 anchor, Vector2 position, float scale, float rotation, float alpha)
+    {
+        RectTransform root = CreateDoodleRoot(parent, name, anchor, position, new Vector2(260f, 260f), scale, rotation, alpha);
+
+        CreateStaticSketchLine(root, name + "Ground", new Vector2(-72f, -96f), new Vector2(80f, -90f), 8f, 0.75f);
+        CreateStaticSketchLine(root, name + "TrunkA", new Vector2(-8f, -96f), new Vector2(5f, -12f), 12f, 0.88f);
+        CreateStaticSketchLine(root, name + "TrunkB", new Vector2(15f, -94f), new Vector2(5f, -12f), 8f, 0.72f);
+        CreateStaticSketchLine(root, name + "BranchLeft", new Vector2(3f, -42f), new Vector2(-62f, 12f), 7f, 0.8f);
+        CreateStaticSketchLine(root, name + "BranchRight", new Vector2(8f, -34f), new Vector2(70f, 18f), 7f, 0.78f);
+        CreateStaticSketchLine(root, name + "BranchTop", new Vector2(6f, -12f), new Vector2(14f, 58f), 7f, 0.76f);
+
+        CreateStaticSketchLine(root, name + "LeafA", new Vector2(-86f, 8f), new Vector2(-48f, 74f), 8f, 0.7f);
+        CreateStaticSketchLine(root, name + "LeafB", new Vector2(-48f, 74f), new Vector2(-2f, 96f), 8f, 0.72f);
+        CreateStaticSketchLine(root, name + "LeafC", new Vector2(-2f, 96f), new Vector2(48f, 72f), 8f, 0.72f);
+        CreateStaticSketchLine(root, name + "LeafD", new Vector2(48f, 72f), new Vector2(88f, 8f), 8f, 0.7f);
+        CreateStaticSketchLine(root, name + "LeafE", new Vector2(-74f, 18f), new Vector2(-16f, 28f), 6f, 0.6f);
+        CreateStaticSketchLine(root, name + "LeafF", new Vector2(-16f, 28f), new Vector2(42f, 16f), 6f, 0.58f);
+    }
+
+    private void CreateFishDoodle(RectTransform parent, string name, Vector2 anchor, Vector2 position, float scale, float rotation, float alpha)
+    {
+        RectTransform root = CreateDoodleRoot(parent, name, anchor, position, new Vector2(270f, 160f), scale, rotation, alpha);
+
+        Vector2 tailBase = new Vector2(-78f, 0f);
+        Vector2 tailTop = new Vector2(-126f, 34f);
+        Vector2 tailBottom = new Vector2(-126f, -34f);
+        Vector2 nose = new Vector2(82f, 0f);
+        Vector2 topFront = new Vector2(38f, 38f);
+        Vector2 topBack = new Vector2(-34f, 30f);
+        Vector2 bottomBack = new Vector2(-34f, -30f);
+        Vector2 bottomFront = new Vector2(38f, -38f);
+
+        CreateStaticSketchLine(root, name + "BodyTopA", tailBase, topBack, 7f, 0.86f);
+        CreateStaticSketchLine(root, name + "BodyTopB", topBack, topFront, 7f, 0.82f);
+        CreateStaticSketchLine(root, name + "BodyTopC", topFront, nose, 7f, 0.86f);
+        CreateStaticSketchLine(root, name + "BodyBottomA", nose, bottomFront, 7f, 0.82f);
+        CreateStaticSketchLine(root, name + "BodyBottomB", bottomFront, bottomBack, 7f, 0.82f);
+        CreateStaticSketchLine(root, name + "BodyBottomC", bottomBack, tailBase, 7f, 0.86f);
+        CreateStaticSketchLine(root, name + "TailTop", tailBase, tailTop, 7f, 0.82f);
+        CreateStaticSketchLine(root, name + "TailBack", tailTop, tailBottom, 7f, 0.78f);
+        CreateStaticSketchLine(root, name + "TailBottom", tailBottom, tailBase, 7f, 0.82f);
+        CreateStaticSketchLine(root, name + "FinA", new Vector2(-8f, 0f), new Vector2(-28f, 22f), 5f, 0.7f);
+        CreateStaticSketchLine(root, name + "FinB", new Vector2(-28f, 22f), new Vector2(10f, 8f), 5f, 0.7f);
+        CreateDoodleDot(root, name + "Eye", new Vector2(52f, 12f), new Vector2(13f, 13f), 0.88f);
+    }
+
+    private void CreateStaticSketchLine(RectTransform parent, string name, Vector2 start, Vector2 end, float thickness, float alpha)
+    {
+        Vector2 delta = end - start;
+
+        if (delta.sqrMagnitude <= 0.01f)
+        {
+            return;
+        }
+
+        RectTransform stroke = CreateImage(name, parent, CreateSketchStrokeSprite(160, 24, new Color(0f, 0f, 0f, alpha)), Color.white);
+        stroke.anchorMin = new Vector2(0.5f, 0.5f);
+        stroke.anchorMax = new Vector2(0.5f, 0.5f);
+        stroke.pivot = new Vector2(0f, 0.5f);
+        stroke.anchoredPosition = start;
+        stroke.sizeDelta = new Vector2(delta.magnitude, thickness);
+        stroke.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+
+        Image image = stroke.GetComponent<Image>();
+        image.raycastTarget = false;
+    }
+
+    private void CreateDoodleDot(RectTransform parent, string name, Vector2 position, Vector2 size, float alpha)
+    {
+        RectTransform dot = CreateImage(name, parent, CreateStainSprite(32, new Color(0f, 0f, 0f, alpha)), Color.white);
+        SetRect(dot, new Vector2(0.5f, 0.5f), position, size);
+
+        Image image = dot.GetComponent<Image>();
+        image.raycastTarget = false;
     }
 
     private RectTransform CreateSketchbook(RectTransform parent)
@@ -283,27 +387,86 @@ public class StartScreenController : MonoBehaviour
 
     private IEnumerator PlayIntro()
     {
-        yield return new WaitForSeconds(0.2f);
+        yield return new WaitForSeconds(0.12f);
 
-        yield return PaintColorSections();
-
-        for (int i = 0; i < decorationGroups.Count; i++)
-        {
-            StartCoroutine(RevealGroup(decorationGroups[i], 0.3f + i * 0.07f, 0.28f));
-        }
-
-        yield return new WaitForSeconds(0.25f);
-        yield return DrawHandwrittenGraphic(titleGraphic, titleDrawCursor, 1.65f, 18f);
-        yield return new WaitForSeconds(0.08f);
+        yield return DrawHandwrittenGraphic(titleGraphic, titleDrawCursor, 1.25f, 20f);
+        yield return new WaitForSeconds(0.05f);
 
         yield return RevealGroup(startButtonGroup, 0f, 0.2f);
-        yield return DrawHandwrittenGraphic(startGraphic, startDrawCursor, 0.95f, 7f);
-        yield return DrawUnderline(startUnderline, startUnderlineWidth, 0.22f);
+        yield return DrawHandwrittenGraphic(gameGraphic, gameDrawCursor, 0.45f, 8f);
+        yield return DrawStartArrow(0.12f);
+        yield return DrawHandwrittenGraphic(startGraphic, startDrawCursor, 0.55f, 8f);
 
         if (startButton != null)
         {
             startButton.interactable = true;
         }
+    }
+
+    private void SplitStartButtonText(out string firstWord, out string secondWord)
+    {
+        string value = string.IsNullOrWhiteSpace(startButtonText) ? "GAME START" : startButtonText;
+        string[] words = value.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+
+        firstWord = words.Length > 0 ? words[0] : "GAME";
+        secondWord = words.Length > 1 ? string.Join(" ", words, 1, words.Length - 1) : "START";
+    }
+
+    private void CreateStartArrow(RectTransform parent)
+    {
+        startArrowStrokes.Clear();
+
+        CreateSketchStroke(parent, "ArrowBody", new Vector2(0.5f, 0.5f), new Vector2(-248f, -4f), new Vector2(190f, 18f), -10f);
+        CreateSketchStroke(parent, "ArrowTurn", new Vector2(0.5f, 0.5f), new Vector2(-68f, -36f), new Vector2(92f, 18f), -72f);
+        CreateSketchStroke(parent, "ArrowHeadLeft", new Vector2(0.5f, 0.5f), new Vector2(-78f, -116f), new Vector2(58f, 17f), 30f);
+        CreateSketchStroke(parent, "ArrowHeadRight", new Vector2(0.5f, 0.5f), new Vector2(-78f, -116f), new Vector2(58f, 17f), -34f);
+    }
+
+    private RectTransform CreateSketchStroke(RectTransform parent, string name, Vector2 anchor, Vector2 position, Vector2 targetSize, float rotation)
+    {
+        RectTransform stroke = CreateImage(name, parent, CreateSketchStrokeSprite(160, 24, new Color(0f, 0f, 0f, 0.94f)), Color.white);
+        stroke.anchorMin = anchor;
+        stroke.anchorMax = anchor;
+        stroke.pivot = new Vector2(0f, 0.5f);
+        stroke.anchoredPosition = position;
+        stroke.sizeDelta = new Vector2(0f, targetSize.y);
+        stroke.localRotation = Quaternion.Euler(0f, 0f, rotation);
+
+        startArrowStrokes.Add(new SketchStroke(stroke, targetSize.x));
+        return stroke;
+    }
+
+    private IEnumerator DrawStartArrow(float strokeDuration)
+    {
+        for (int i = 0; i < startArrowStrokes.Count; i++)
+        {
+            yield return DrawSketchStroke(startArrowStrokes[i].Rect, startArrowStrokes[i].TargetWidth, strokeDuration);
+        }
+    }
+
+    private IEnumerator DrawSketchStroke(RectTransform stroke, float targetWidth, float duration)
+    {
+        if (stroke == null)
+        {
+            yield break;
+        }
+
+        Vector2 size = stroke.sizeDelta;
+        size.x = 0f;
+        stroke.sizeDelta = size;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsed / duration);
+            size.x = Mathf.Lerp(0f, targetWidth, Mathf.SmoothStep(0f, 1f, progress));
+            stroke.sizeDelta = size;
+            yield return null;
+        }
+
+        size.x = targetWidth;
+        stroke.sizeDelta = size;
     }
 
     private IEnumerator DrawHandwrittenGraphic(HandwrittenTextGraphic graphic, RectTransform cursor, float duration, float cursorHeight)
@@ -576,6 +739,15 @@ public class StartScreenController : MonoBehaviour
         rectTransform.SetParent(parent, false);
         SetRect(rectTransform, anchor, position, size);
         return gameObject.AddComponent<CanvasGroup>();
+    }
+
+    private RectTransform CreateRectTransform(string name, RectTransform parent, Vector2 anchor, Vector2 position, Vector2 size)
+    {
+        GameObject gameObject = new GameObject(name);
+        RectTransform rectTransform = gameObject.AddComponent<RectTransform>();
+        rectTransform.SetParent(parent, false);
+        SetRect(rectTransform, anchor, position, size);
+        return rectTransform;
     }
 
     private Text CreateText(string name, Transform parent, string text, int fontSize, FontStyle fontStyle, Color color, TextAnchor alignment)
@@ -918,6 +1090,32 @@ public class StartScreenController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
     }
 
+    private Sprite CreateSketchStrokeSprite(int width, int height, Color color)
+    {
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color[] pixels = new Color[width * height];
+        float halfHeight = height * 0.5f;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int hash = Mathf.Abs((x * 374761393) ^ (y * 668265263) ^ 0x2a77);
+                float grain = (hash % 1000) / 1000f;
+                float center = halfHeight + Mathf.Sin(x * 0.13f) * 1.4f + Mathf.Sin(x * 0.041f) * 1.9f;
+                float distance = Mathf.Abs(y - center);
+                float edge = Mathf.Clamp01(1f - distance / (halfHeight * 0.72f));
+                float brokenInk = grain > 0.94f ? 0.45f : 1f;
+                float alpha = Mathf.SmoothStep(0f, 1f, edge) * color.a * brokenInk * (0.78f + grain * 0.3f);
+                pixels[y * width + x] = new Color(color.r, color.g, color.b, Mathf.Clamp01(alpha));
+            }
+        }
+
+        texture.SetPixels(pixels);
+        texture.Apply(false, true);
+        return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0f, 0.5f), 100f);
+    }
+
     private float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
     {
         Vector2 segment = end - start;
@@ -945,6 +1143,18 @@ public class StartScreenController : MonoBehaviour
         public RectTransform Rect { get; }
         public CanvasGroup Group { get; }
         public float Delay { get; }
+    }
+
+    private struct SketchStroke
+    {
+        public SketchStroke(RectTransform rect, float targetWidth)
+        {
+            Rect = rect;
+            TargetWidth = targetWidth;
+        }
+
+        public RectTransform Rect { get; }
+        public float TargetWidth { get; }
     }
 
     private Sprite CreatePanelSprite(int width, int height, Color fillColor, Color borderColor, int borderThickness)

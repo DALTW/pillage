@@ -7615,9 +7615,23 @@ public class FourthForestIslandDoorInteract : MonoBehaviour, IInteractable
 
 public class FinalGameEndingController : MonoBehaviour
 {
+    private const string EndSceneName = "EndScene";
+
     private static FinalGameEndingController instance;
 
     public static bool IsEnding { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetOnSubsystemRegistration()
+    {
+        ResetEndingState();
+    }
+
+    public static void ResetEndingState()
+    {
+        instance = null;
+        IsEnding = false;
+    }
 
     public static void ShowEnding(GameObject interactor)
     {
@@ -7639,7 +7653,7 @@ public class FinalGameEndingController : MonoBehaviour
 
         IsEnding = true;
         FreezePlayer(interactor);
-        StartCoroutine(PlayEndingRoutine());
+        UnityEngine.SceneManagement.SceneManager.LoadScene(EndSceneName, UnityEngine.SceneManagement.LoadSceneMode.Single);
     }
 
     private static void FreezePlayer(GameObject interactor)
