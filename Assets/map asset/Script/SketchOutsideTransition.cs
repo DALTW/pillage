@@ -2,6 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class SketchOutsideTransition : MonoBehaviour
 {
@@ -81,6 +84,9 @@ public class SketchOutsideTransition : MonoBehaviour
     private const string QuestNpcCompletePrompt = "[\uD3B8\uC9C0]+[!]";
     private const string GrassResourcePath = "Outside/grass_thick";
     private const string MailboxResourcePath = "Outside/mailbox_thick";
+#if UNITY_EDITOR
+    private const string EditorDefaultMapAssetPath = "Assets/map asset/MapDefinitions/DefaultPillageMap.asset";
+#endif
     private static readonly Color VillageGreenColor = new Color32(69, 158, 72, 255);
     private static readonly Color VillageGrassLightGreenColor = new Color32(151, 214, 83, 255);
     private static readonly Color BrownCrayonColor = new Color32(139, 82, 39, 232);
@@ -179,6 +185,8 @@ public class SketchOutsideTransition : MonoBehaviour
     private static SketchOutsideTransition instance;
     private static bool hasStoredInteriorCameraSize;
     private static float interiorCameraOrthographicSize;
+
+    [SerializeField] private PillageMapDefinition mapDefinition;
 
     private GameObject contentRoot;
     private GameObject propRoot;
@@ -405,7 +413,236 @@ public class SketchOutsideTransition : MonoBehaviour
     private void Awake()
     {
         instance = this;
+        LoadDefaultMapDefinitionIfNeeded();
     }
+
+    private void LoadDefaultMapDefinitionIfNeeded()
+    {
+        if (mapDefinition != null)
+        {
+            return;
+        }
+
+#if UNITY_EDITOR
+        mapDefinition = AssetDatabase.LoadAssetAtPath<PillageMapDefinition>(EditorDefaultMapAssetPath);
+#else
+        mapDefinition = Resources.Load<PillageMapDefinition>("MapDefinitions/DefaultPillageMap");
+#endif
+    }
+
+    private bool TryGetMapPlacement(string objectName, out MapObjectPlacement placement)
+    {
+        LoadDefaultMapDefinitionIfNeeded();
+        placement = null;
+        return mapDefinition != null && mapDefinition.TryGetObject(objectName, out placement) && placement != null && placement.Enabled;
+    }
+
+    private Vector3 ResolvePlacementPosition(string objectName, Vector3 fallbackPosition)
+    {
+        return TryGetMapPlacement(objectName, out MapObjectPlacement placement)
+            ? placement.Position
+            : fallbackPosition;
+    }
+
+    private Vector3 ResolvePlacementScale(string objectName, Vector3 fallbackScale)
+    {
+        return TryGetMapPlacement(objectName, out MapObjectPlacement placement)
+            ? placement.Scale
+            : fallbackScale;
+    }
+
+    private int ResolvePlacementSortingOrder(string objectName, int fallbackSortingOrder)
+    {
+        return TryGetMapPlacement(objectName, out MapObjectPlacement placement)
+            ? placement.SortingOrder
+            : fallbackSortingOrder;
+    }
+
+    private float ResolvePlacementPromptDistance(string objectName, float fallbackDistance)
+    {
+        return TryGetMapPlacement(objectName, out MapObjectPlacement placement) && placement.PromptDistance > 0f
+            ? placement.PromptDistance
+            : fallbackDistance;
+    }
+
+    private int ResolvePlacementPromptSortingOrder(string objectName, int fallbackSortingOrder)
+    {
+        return TryGetMapPlacement(objectName, out MapObjectPlacement placement) && placement.PromptSortingOrder != 0
+            ? placement.PromptSortingOrder
+            : fallbackSortingOrder;
+    }
+
+    private Color ResolvePlacementLineColor(string objectName, Color fallbackColor)
+    {
+        return TryGetMapPlacement(objectName, out MapObjectPlacement placement)
+            ? placement.LineColor
+            : fallbackColor;
+    }
+
+    private float ResolvePlacementLineWidth(string objectName, float fallbackWidth)
+    {
+        return TryGetMapPlacement(objectName, out MapObjectPlacement placement)
+            ? fallbackWidth * Mathf.Max(0.01f, placement.LineWidthMultiplier)
+            : fallbackWidth;
+    }
+
+    private float ResolvePlacementRevealDistance(string objectName, float fallbackDistance)
+    {
+        return TryGetMapPlacement(objectName, out MapObjectPlacement placement) && placement.RevealDistance > 0f
+            ? placement.RevealDistance
+            : fallbackDistance;
+    }
+
+    private Vector3[] ResolvePlacementRevealTriggers(string objectName, Vector3[] fallbackPositions)
+    {
+        if (!TryGetMapPlacement(objectName, out MapObjectPlacement placement) || placement.RevealTriggerPositions.Count <= 0)
+        {
+            return fallbackPositions;
+        }
+
+        return placement.RevealTriggerPositions.ToArray();
+    }
+
+#if UNITY_EDITOR
+    private void RecordDefaultPlacement(
+        string objectName,
+        MapObjectType type,
+        Vector3 position,
+        Vector3 scale,
+        int sortingOrder,
+        float promptDistance = 0f,
+        int promptSortingOrder = 0,
+        string resourcePath = null)
+    {
+        LoadDefaultMapDefinitionIfNeeded();
+        if (mapDefinition == null || mapDefinition.TryGetObject(objectName, out _))
+        {
+            return;
+        }
+
+        MapObjectPlacement placement = mapDefinition.GetOrAddObject(objectName, type);
+        placement.Region = InferRegion(position);
+        placement.Position = position;
+        placement.Scale = scale;
+        placement.SortingOrder = sortingOrder;
+        placement.PromptDistance = promptDistance;
+        placement.PromptSortingOrder = promptSortingOrder;
+        placement.ResourcePath = resourcePath;
+        placement.LineColor = new Color32(35, 32, 28, 255);
+        placement.LineWidthMultiplier = 1f;
+        EditorUtility.SetDirty(mapDefinition);
+    }
+
+    private static string InferRegion(Vector3 position)
+    {
+        if (position.x >= FourthForestRegionOffset.x - FourthForestSize.x * 0.5f)
+        {
+            return "FourthForest";
+        }
+
+        if (position.x >= DeepForestRegionOffset.x - DeepForestSize.x * 0.5f)
+        {
+            return "DeepForest";
+        }
+
+        if (position.x >= ForestRegionOffset.x - BackgroundSize.x * 0.5f)
+        {
+            return "Forest";
+        }
+
+        return "Village";
+    }
+
+    private static MapObjectType InferObjectType(string objectName)
+    {
+        if (objectName.Contains("Boundary") || objectName.Contains("Collider"))
+        {
+            return MapObjectType.BoundaryCollider;
+        }
+        if (objectName.Contains("GroundStroke"))
+        {
+            return MapObjectType.GroundStroke;
+        }
+        if (objectName.Contains("Fence"))
+        {
+            return MapObjectType.Fence;
+        }
+        if (objectName.Contains("Path"))
+        {
+            return MapObjectType.Path;
+        }
+        if (objectName.Contains("House"))
+        {
+            return MapObjectType.House;
+        }
+        if (objectName.Contains("Door"))
+        {
+            return MapObjectType.Door;
+        }
+        if (objectName.Contains("Mailbox"))
+        {
+            return MapObjectType.Mailbox;
+        }
+        if (objectName.Contains("Npc") || objectName.Contains("NPC"))
+        {
+            return MapObjectType.QuestNpc;
+        }
+        if (objectName.Contains("Pond"))
+        {
+            return MapObjectType.Pond;
+        }
+        if (objectName.Contains("FishingRod"))
+        {
+            return MapObjectType.FishingRod;
+        }
+        if (objectName.Contains("Pine") || objectName.Contains("Tree"))
+        {
+            return MapObjectType.PineTree;
+        }
+        if (objectName.Contains("Grass"))
+        {
+            return MapObjectType.Grass;
+        }
+        if (objectName.Contains("Rock"))
+        {
+            return MapObjectType.Rock;
+        }
+        if (objectName.Contains("Mole"))
+        {
+            return MapObjectType.MoleHole;
+        }
+        if (objectName.Contains("Bird"))
+        {
+            return MapObjectType.Bird;
+        }
+        if (objectName.Contains("Well"))
+        {
+            return MapObjectType.Well;
+        }
+        if (objectName.Contains("Squirrel"))
+        {
+            return MapObjectType.Squirrel;
+        }
+        if (objectName.Contains("Bush"))
+        {
+            return MapObjectType.Bush;
+        }
+        if (objectName.Contains("LeafPile"))
+        {
+            return MapObjectType.LeafPile;
+        }
+        if (objectName.Contains("River"))
+        {
+            return MapObjectType.River;
+        }
+        if (objectName.Contains("Letter"))
+        {
+            return MapObjectType.LetterFragment;
+        }
+
+        return MapObjectType.LineDrawing;
+    }
+#endif
 
     private void Update()
     {
@@ -440,7 +677,10 @@ public class SketchOutsideTransition : MonoBehaviour
         player.transform.position = exitTargetPosition + OutsidePlayerOffset;
         ApplyOutsideCameraSize();
         SnapCameraToPlayer(player);
-        houseDoorInteract.Configure(this, interiorEntryPosition, 1.6f);
+        houseDoorInteract.Configure(
+            this,
+            interiorEntryPosition,
+            ResolvePlacementPromptDistance("GeneratedOutsideHouseDoor", 1.6f));
 
         SetPlayerMovementEnabled(player, false);
 
@@ -594,7 +834,11 @@ public class SketchOutsideTransition : MonoBehaviour
             return;
         }
 
-        MapRevealItem item = new MapRevealItem(localTriggerPositions, lineDrawing);
+        string objectName = lineDrawing.gameObject.name;
+        MapRevealItem item = new MapRevealItem(
+            ResolvePlacementRevealTriggers(objectName, localTriggerPositions),
+            ResolvePlacementRevealDistance(objectName, MapRevealDistance),
+            lineDrawing);
         item.ApplyProgress(0f);
         mapRevealItems.Add(item);
     }
@@ -606,7 +850,12 @@ public class SketchOutsideTransition : MonoBehaviour
             return;
         }
 
-        MapRevealItem item = new MapRevealItem(localTriggerPositions, lineDrawing, enableWhenRevealed);
+        string objectName = lineDrawing.gameObject.name;
+        MapRevealItem item = new MapRevealItem(
+            ResolvePlacementRevealTriggers(objectName, localTriggerPositions),
+            ResolvePlacementRevealDistance(objectName, MapRevealDistance),
+            lineDrawing,
+            enableWhenRevealed);
         item.ApplyProgress(0f);
         mapRevealItems.Add(item);
     }
@@ -618,7 +867,11 @@ public class SketchOutsideTransition : MonoBehaviour
             return;
         }
 
-        MapRevealItem item = new MapRevealItem(localTriggerPositions, revealDistance, lineDrawing);
+        string objectName = lineDrawing.gameObject.name;
+        MapRevealItem item = new MapRevealItem(
+            ResolvePlacementRevealTriggers(objectName, localTriggerPositions),
+            ResolvePlacementRevealDistance(objectName, revealDistance),
+            lineDrawing);
         item.ApplyProgress(0f);
         mapRevealItems.Add(item);
     }
@@ -630,7 +883,12 @@ public class SketchOutsideTransition : MonoBehaviour
             return;
         }
 
-        MapRevealItem item = new MapRevealItem(localTriggerPositions, revealDistance, lineDrawing, enableWhenRevealed);
+        string objectName = lineDrawing.gameObject.name;
+        MapRevealItem item = new MapRevealItem(
+            ResolvePlacementRevealTriggers(objectName, localTriggerPositions),
+            ResolvePlacementRevealDistance(objectName, revealDistance),
+            lineDrawing,
+            enableWhenRevealed);
         item.ApplyProgress(0f);
         mapRevealItems.Add(item);
     }
@@ -642,7 +900,9 @@ public class SketchOutsideTransition : MonoBehaviour
             return;
         }
 
-        MapRevealItem item = new MapRevealItem(localPosition, spriteRenderer, spriteRenderer.transform, enableWhenRevealed);
+        string objectName = spriteRenderer.gameObject.name;
+        Vector3 triggerPosition = ResolvePlacementRevealTriggers(objectName, new[] { localPosition })[0];
+        MapRevealItem item = new MapRevealItem(triggerPosition, spriteRenderer, spriteRenderer.transform, enableWhenRevealed);
         item.ApplyProgress(0f);
         mapRevealItems.Add(item);
     }
@@ -655,7 +915,7 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         bool isNpcVisible = questNpcDrawing.RevealProgress >= 0.95f;
-        Vector3 npcPosition = propRoot.transform.TransformPoint(GetQuestNpcPosition());
+        Vector3 npcPosition = questNpcDrawing.transform.position;
         bool isNearNpc = Vector2.Distance(outsidePlayer.position, npcPosition) <= QuestNpcPromptDistance;
         bool canShowPrompt = !GameProgress.HasDeliveredCompletedLetter;
 
@@ -1032,28 +1292,44 @@ public class SketchOutsideTransition : MonoBehaviour
 
     private SketchWorldLineDrawing CreateHouseDrawing()
     {
-        GameObject drawingObject = new GameObject("GeneratedOutsideHouseLineDrawing");
+        const string objectName = "GeneratedOutsideHouseLineDrawing";
+        GameObject drawingObject = new GameObject(objectName);
         drawingObject.transform.SetParent(contentRoot.transform, false);
-        drawingObject.transform.localPosition = HouseOffset;
+        drawingObject.transform.localPosition = ResolvePlacementPosition(objectName, HouseOffset);
 
         SketchWorldLineDrawing drawing = drawingObject.AddComponent<SketchWorldLineDrawing>();
-        drawing.Configure(HouseLineWidth, new Color32(35, 32, 28, 255), PropSortingOrder);
+        drawing.Configure(
+            ResolvePlacementLineWidth(objectName, HouseLineWidth),
+            ResolvePlacementLineColor(objectName, new Color32(35, 32, 28, 255)),
+            ResolvePlacementSortingOrder(objectName, PropSortingOrder));
         drawing.SetStrokes(BuildHouseStrokes());
         drawing.RevealProgress = 0f;
+#if UNITY_EDITOR
+        RecordDefaultPlacement(objectName, MapObjectType.House, HouseOffset, Vector3.one, PropSortingOrder);
+#endif
         return drawing;
     }
 
     private SketchOutsideDoorInteract CreateHouseDoor()
     {
-        GameObject doorObject = new GameObject("GeneratedOutsideHouseDoor");
+        const string objectName = "GeneratedOutsideHouseDoor";
+        GameObject doorObject = new GameObject(objectName);
         doorObject.transform.SetParent(contentRoot.transform, false);
-        doorObject.transform.localPosition = DoorOffset;
+        doorObject.transform.localPosition = ResolvePlacementPosition(objectName, DoorOffset);
 
         houseDoorCollider = doorObject.AddComponent<BoxCollider2D>();
         houseDoorCollider.isTrigger = true;
-        houseDoorCollider.size = new Vector2(0.9f, 1.2f);
+        houseDoorCollider.size = TryGetMapPlacement(objectName, out MapObjectPlacement placement) && placement.ColliderSize != Vector2.zero
+            ? placement.ColliderSize
+            : new Vector2(0.9f, 1.2f);
+        houseDoorCollider.offset = TryGetMapPlacement(objectName, out placement)
+            ? placement.ColliderOffset
+            : Vector2.zero;
         houseDoorCollider.enabled = false;
 
+#if UNITY_EDITOR
+        RecordDefaultPlacement(objectName, MapObjectType.Door, DoorOffset, Vector3.one, PropSortingOrder, 1.6f);
+#endif
         return doorObject.AddComponent<SketchOutsideDoorInteract>();
     }
 
@@ -3414,7 +3690,9 @@ public class SketchOutsideTransition : MonoBehaviour
             QuestNpcSortingOrder,
             propRoot.transform);
         questNpcRewardInteract = questNpcDrawing.gameObject.AddComponent<QuestNpcLetterRewardInteract>();
-        questNpcRewardInteract.Configure(this, QuestNpcPromptDistance);
+        questNpcRewardInteract.Configure(
+            this,
+            ResolvePlacementPromptDistance("GeneratedQuestGiverNpcLineDrawing", QuestNpcPromptDistance));
         questNpcRewardInteract.enabled = false;
         RegisterLineReveal(questNpcDrawing, questNpcRewardInteract, npcPosition);
 
@@ -3547,10 +3825,11 @@ public class SketchOutsideTransition : MonoBehaviour
             PropSortingOrder + 2,
             propRoot.transform,
             new Color32(57, 104, 132, 255));
-        RegisterLineReveal(pondDrawing, PondOffset);
+        Vector3 pondPosition = pondDrawing.transform.localPosition;
+        RegisterLineReveal(pondDrawing, pondPosition);
         CreatePondCollider();
 
-        Vector3 fishingRodPosition = PondOffset + new Vector3(4.55f, 1.05f, 0f);
+        Vector3 fishingRodPosition = pondPosition + new Vector3(4.55f, 1.05f, 0f);
         SketchWorldLineDrawing fishingRodDrawing = CreateLineDrawing(
             "GeneratedFishingRodLineDrawing",
             fishingRodPosition,
@@ -3559,7 +3838,10 @@ public class SketchOutsideTransition : MonoBehaviour
             propRoot.transform,
             new Color32(64, 44, 30, 255));
         FishingRodInteract fishingRodInteract = fishingRodDrawing.gameObject.AddComponent<FishingRodInteract>();
-        fishingRodInteract.Configure(PondOffset, PropSortingOrder + 50, pondDrawing);
+        fishingRodInteract.Configure(
+            pondPosition,
+            ResolvePlacementPromptSortingOrder("GeneratedFishingRodLineDrawing", PropSortingOrder + 50),
+            pondDrawing);
         fishingRodInteract.enabled = false;
 
         RegisterLineReveal(fishingRodDrawing, fishingRodInteract, fishingRodPosition);
@@ -3619,22 +3901,35 @@ public class SketchOutsideTransition : MonoBehaviour
     {
         GameObject colliderObject = new GameObject("GeneratedPondCollider");
         colliderObject.transform.SetParent(propRoot.transform, false);
-        colliderObject.transform.localPosition = PondOffset;
+        colliderObject.transform.localPosition = ResolvePlacementPosition("GeneratedPondCollider", ResolvePlacementPosition("GeneratedPondLineDrawing", PondOffset));
 
         PolygonCollider2D collider = colliderObject.AddComponent<PolygonCollider2D>();
         collider.isTrigger = false;
+#if UNITY_EDITOR
+        RecordDefaultPlacement("GeneratedPondCollider", MapObjectType.BoundaryCollider, PondOffset, Vector3.one, PropSortingOrder + 2);
+#endif
         collider.SetPath(0, EllipseColliderPoints(4.9f, 2.52f, 32));
     }
 
     private BoxCollider2D CreateBoundaryCollider(string objectName, Transform parent, Vector2 localPosition, Vector2 size)
     {
+        Vector3 resolvedPosition = ResolvePlacementPosition(objectName, localPosition);
+        Vector2 resolvedSize = TryGetMapPlacement(objectName, out MapObjectPlacement placement) && placement.ColliderSize != Vector2.zero
+            ? placement.ColliderSize
+            : size;
         GameObject colliderObject = new GameObject(objectName);
         colliderObject.transform.SetParent(parent, false);
-        colliderObject.transform.localPosition = localPosition;
+        colliderObject.transform.localPosition = resolvedPosition;
 
         BoxCollider2D collider = colliderObject.AddComponent<BoxCollider2D>();
-        collider.size = size;
+        collider.size = resolvedSize;
+        collider.offset = TryGetMapPlacement(objectName, out placement)
+            ? placement.ColliderOffset
+            : Vector2.zero;
         collider.isTrigger = false;
+#if UNITY_EDITOR
+        RecordDefaultPlacement(objectName, MapObjectType.BoundaryCollider, localPosition, Vector3.one, 0);
+#endif
         return collider;
     }
 
@@ -3651,14 +3946,19 @@ public class SketchOutsideTransition : MonoBehaviour
             return CreateBoundaryCollider(objectName, parent, localPosition, size);
         }
 
-        existing.localPosition = localPosition;
+        existing.localPosition = ResolvePlacementPosition(objectName, localPosition);
         BoxCollider2D collider = existing.GetComponent<BoxCollider2D>();
         if (collider == null)
         {
             collider = existing.gameObject.AddComponent<BoxCollider2D>();
         }
 
-        collider.size = size;
+        collider.size = TryGetMapPlacement(objectName, out MapObjectPlacement placement) && placement.ColliderSize != Vector2.zero
+            ? placement.ColliderSize
+            : size;
+        collider.offset = TryGetMapPlacement(objectName, out placement)
+            ? placement.ColliderOffset
+            : Vector2.zero;
         collider.isTrigger = false;
         collider.enabled = true;
         return collider;
@@ -3985,22 +4285,34 @@ public class SketchOutsideTransition : MonoBehaviour
 
     private SketchWorldLineDrawing CreateLineDrawing(string objectName, Vector3 localPosition, List<Vector3[]> strokes, int sortingOrder, Transform parent, Color color)
     {
+        Vector3 resolvedPosition = ResolvePlacementPosition(objectName, localPosition);
+        int resolvedSortingOrder = ResolvePlacementSortingOrder(objectName, sortingOrder);
+        Color resolvedColor = ResolvePlacementLineColor(objectName, color);
+
         GameObject drawingObject = new GameObject(objectName);
         drawingObject.transform.SetParent(parent != null ? parent : contentRoot.transform, false);
-        drawingObject.transform.localPosition = localPosition;
+        drawingObject.transform.localPosition = resolvedPosition;
 
         SketchWorldLineDrawing drawing = drawingObject.AddComponent<SketchWorldLineDrawing>();
-        drawing.Configure(HouseLineWidth, color, sortingOrder);
+        drawing.Configure(ResolvePlacementLineWidth(objectName, HouseLineWidth), resolvedColor, resolvedSortingOrder);
         drawing.SetStrokes(strokes);
+#if UNITY_EDITOR
+        RecordDefaultPlacement(objectName, InferObjectType(objectName), localPosition, Vector3.one, sortingOrder);
+#endif
         return drawing;
     }
 
     private Transform CreateSpriteProp(string objectName, string resourcePath, Vector3 localPosition, Vector3 localScale, int sortingOrder, Transform parent = null, bool addGrassSway = false)
     {
-        Sprite sprite = LoadSketchSprite(resourcePath);
+        string resolvedResourcePath = TryGetMapPlacement(objectName, out MapObjectPlacement placement) && !string.IsNullOrWhiteSpace(placement.ResourcePath)
+            ? placement.ResourcePath
+            : resourcePath;
+        Sprite sprite = TryGetMapPlacement(objectName, out placement) && placement.Sprite != null
+            ? placement.Sprite
+            : LoadSketchSprite(resolvedResourcePath);
         if (sprite == null)
         {
-            Debug.LogWarning($"Outside prop sprite not found: {resourcePath}", this);
+            Debug.LogWarning($"Outside prop sprite not found: {resolvedResourcePath}", this);
             return null;
         }
 
@@ -4009,67 +4321,88 @@ public class SketchOutsideTransition : MonoBehaviour
 
     private Transform CreateSpriteProp(string objectName, Sprite sprite, Vector3 localPosition, Vector3 localScale, int sortingOrder, Transform parent = null, bool addGrassSway = false)
     {
+        Vector3 resolvedPosition = ResolvePlacementPosition(objectName, localPosition);
+        Vector3 resolvedScale = ResolvePlacementScale(objectName, localScale);
+        int resolvedSortingOrder = ResolvePlacementSortingOrder(objectName, sortingOrder);
+        bool resolvedGrassSway = TryGetMapPlacement(objectName, out MapObjectPlacement placement)
+            ? placement.AddGrassSway
+            : addGrassSway;
+
         GameObject propObject = new GameObject(objectName);
         propObject.transform.SetParent(parent != null ? parent : contentRoot.transform, false);
-        propObject.transform.localScale = localScale;
+        propObject.transform.localScale = resolvedScale;
 
         SpriteRenderer spriteRenderer = propObject.AddComponent<SpriteRenderer>();
         spriteRenderer.sprite = sprite;
-        spriteRenderer.sortingOrder = sortingOrder;
+        spriteRenderer.sortingOrder = resolvedSortingOrder;
         if (GameProgress.HasColoredVillageGreen && IsGrassColoringTarget(objectName))
         {
             ApplyGrassLightGreenColor(spriteRenderer);
         }
 
-        float groundedYOffset = sprite.bounds.extents.y * Mathf.Abs(localScale.y);
-        propObject.transform.localPosition = localPosition + new Vector3(0f, groundedYOffset, 0f);
+        float groundedYOffset = sprite.bounds.extents.y * Mathf.Abs(resolvedScale.y);
+        propObject.transform.localPosition = resolvedPosition + new Vector3(0f, groundedYOffset, 0f);
         Behaviour enableWhenRevealed = null;
 
-        if (addGrassSway)
+        if (resolvedGrassSway)
         {
             GrassSwayOnPlayerNear grassSway = propObject.AddComponent<GrassSwayOnPlayerNear>();
             grassSway.enabled = false;
             enableWhenRevealed = grassSway;
         }
 
-        RegisterSpriteReveal(spriteRenderer, localPosition, enableWhenRevealed);
+        RegisterSpriteReveal(spriteRenderer, resolvedPosition, enableWhenRevealed);
         if (GameProgress.HasColoredVillageGreen && IsGrassColoringTarget(objectName))
         {
             CreateGrassColorOverlay(spriteRenderer);
         }
 
-        CreatePropGroundStroke(objectName, localPosition, sprite.bounds.extents.x * Mathf.Abs(localScale.x), sortingOrder - 1, parent);
+#if UNITY_EDITOR
+        RecordDefaultPlacement(objectName, InferObjectType(objectName), localPosition, localScale, sortingOrder, 0f, 0, null);
+#endif
+        float groundHalfWidth = TryGetMapPlacement(objectName, out placement) && placement.GroundStrokeWidth > 0f
+            ? placement.GroundStrokeWidth
+            : sprite.bounds.extents.x * Mathf.Abs(resolvedScale.x);
+        CreatePropGroundStroke(objectName, resolvedPosition, groundHalfWidth, resolvedSortingOrder - 1, parent);
         return propObject.transform;
     }
 
     private PineTreeShakeInteract CreatePineTreeProp(string objectName, Vector3 localPosition, float scale, int sortingOrder, Transform parent = null)
     {
+        Vector3 resolvedPosition = ResolvePlacementPosition(objectName, localPosition);
+        float resolvedScale = ResolvePlacementScale(objectName, new Vector3(scale, scale, 1f)).y;
+        int resolvedSortingOrder = ResolvePlacementSortingOrder(objectName, sortingOrder);
         SketchWorldLineDrawing pineTree = CreateLineDrawing(
             objectName,
-            localPosition,
-            BuildPineTreeStrokes(scale),
-            sortingOrder,
+            resolvedPosition,
+            BuildPineTreeStrokes(resolvedScale),
+            resolvedSortingOrder,
             parent);
         TreeCrayonColorTarget colorTarget = pineTree.gameObject.AddComponent<TreeCrayonColorTarget>();
-        colorTarget.Configure(scale);
+        colorTarget.Configure(resolvedScale);
 
         PineTreeShakeInteract treeInteract = pineTree.gameObject.AddComponent<PineTreeShakeInteract>();
-        treeInteract.Configure(scale, sortingOrder + 47);
+        treeInteract.Configure(
+            resolvedScale,
+            ResolvePlacementPromptSortingOrder(objectName, resolvedSortingOrder + 47));
         treeInteract.enabled = false;
 
-        RegisterLineReveal(pineTree, treeInteract, localPosition);
-        CreatePropGroundStroke(objectName, localPosition, 1.16f * scale, sortingOrder - 1, parent);
+        RegisterLineReveal(pineTree, treeInteract, resolvedPosition);
+        CreatePropGroundStroke(objectName, resolvedPosition, 1.16f * resolvedScale, resolvedSortingOrder - 1, parent);
 
         if (GameProgress.HasColoredVillageGreen)
         {
-            CreateTreeLeafOverlay(colorTarget, pineTree, sortingOrder + 2);
+            CreateTreeLeafOverlay(colorTarget, pineTree, resolvedSortingOrder + 2);
         }
 
         if (GameProgress.HasColoredBrownDetails)
         {
-            CreateTreeTrunkOverlay(colorTarget, pineTree, sortingOrder + 3);
+            CreateTreeTrunkOverlay(colorTarget, pineTree, resolvedSortingOrder + 3);
         }
 
+#if UNITY_EDITOR
+        RecordDefaultPlacement(objectName, MapObjectType.PineTree, localPosition, new Vector3(scale, scale, 1f), sortingOrder, 0f, sortingOrder + 47);
+#endif
         return treeInteract;
     }
 
