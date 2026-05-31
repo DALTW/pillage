@@ -32,6 +32,12 @@ public class SketchOutsideDoorInteract : MonoBehaviour, IInteractable
             return;
         }
 
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == SceneTravelState.MainSceneName)
+        {
+            SceneTravelState.LoadScene(SceneTravelState.SampleSceneName, SceneTravelState.InteriorReturnSpawnPointId);
+            return;
+        }
+
         if (owner != null)
         {
             owner.EnterWoodhouse(interactor, interiorEntryPosition);

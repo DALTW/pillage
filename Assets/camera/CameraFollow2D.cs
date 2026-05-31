@@ -26,4 +26,14 @@ public class CameraFollow2D : MonoBehaviour
 
         transform.position = target.position + offset;
     }
+
+    public void SetTarget(Transform newTarget, bool snapToTarget)
+    {
+        target = newTarget;
+
+        if (snapToTarget)
+        {
+            SnapToTarget();
+        }
+    }
 }

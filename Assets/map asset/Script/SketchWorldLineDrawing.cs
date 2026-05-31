@@ -10,6 +10,7 @@ public class SketchWorldLineDrawing : MonoBehaviour
     [SerializeField] private Color lineColor = new Color32(35, 32, 28, 255);
     [SerializeField] private int sortingOrder = 8;
     [SerializeField, Range(0f, 1f)] private float revealProgress;
+    [SerializeField] private List<SerializedStroke> serializedStrokes = new List<SerializedStroke>();
 
     private readonly List<Vector3[]> strokes = new List<Vector3[]>();
     private readonly List<float> strokeLengths = new List<float>();
@@ -52,6 +53,7 @@ public class SketchWorldLineDrawing : MonoBehaviour
             ActiveDrawings.Add(this);
         }
 
+        RebuildStrokesFromSerializedDataIfNeeded();
         RefreshLineWidths();
     }
 
@@ -78,6 +80,7 @@ public class SketchWorldLineDrawing : MonoBehaviour
     public void SetStrokes(IEnumerable<Vector3[]> newStrokes)
     {
         ClearStrokes();
+        serializedStrokes.Clear();
 
         foreach (Vector3[] stroke in newStrokes)
         {
@@ -97,6 +100,7 @@ public class SketchWorldLineDrawing : MonoBehaviour
             strokes.Add(copy);
             strokeLengths.Add(length);
             totalLength += length;
+            serializedStrokes.Add(new SerializedStroke(copy));
 
             LineRenderer lineRenderer = CreateRenderer($"GeneratedSketchStroke_{renderers.Count:00}");
             renderers.Add(lineRenderer);
@@ -111,14 +115,64 @@ public class SketchWorldLineDrawing : MonoBehaviour
         {
             if (renderers[i] != null)
             {
-                Destroy(renderers[i].gameObject);
+                DestroyUnityObject(renderers[i].gameObject);
             }
         }
 
+        DestroyGeneratedStrokeChildren();
         strokes.Clear();
         strokeLengths.Clear();
         renderers.Clear();
         totalLength = 0f;
+    }
+
+    private void RebuildStrokesFromSerializedDataIfNeeded()
+    {
+        if (renderers.Count > 0 || serializedStrokes.Count == 0)
+        {
+            return;
+        }
+
+        DestroyGeneratedStrokeChildren();
+        strokes.Clear();
+        strokeLengths.Clear();
+        totalLength = 0f;
+
+        for (int i = 0; i < serializedStrokes.Count; i++)
+        {
+            Vector3[] stroke = serializedStrokes[i].ToArray();
+            if (stroke.Length < 2)
+            {
+                continue;
+            }
+
+            float length = CalculateStrokeLength(stroke);
+            if (length <= 0f)
+            {
+                continue;
+            }
+
+            strokes.Add(stroke);
+            strokeLengths.Add(length);
+            totalLength += length;
+
+            LineRenderer lineRenderer = CreateRenderer($"GeneratedSketchStroke_{renderers.Count:00}");
+            renderers.Add(lineRenderer);
+        }
+
+        UpdateRenderers();
+    }
+
+    private void DestroyGeneratedStrokeChildren()
+    {
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = transform.GetChild(i);
+            if (child != null && child.name.StartsWith("GeneratedSketchStroke_"))
+            {
+                DestroyUnityObject(child.gameObject);
+            }
+        }
     }
 
     private LineRenderer CreateRenderer(string objectName)
@@ -256,7 +310,44 @@ public class SketchWorldLineDrawing : MonoBehaviour
 
         if (lineMaterial != null)
         {
-            Destroy(lineMaterial);
+            DestroyUnityObject(lineMaterial);
+        }
+    }
+
+    private static void DestroyUnityObject(Object target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(target);
+        }
+        else
+        {
+            DestroyImmediate(target);
+        }
+    }
+
+    [System.Serializable]
+    private class SerializedStroke
+    {
+        [SerializeField] private List<Vector3> points = new List<Vector3>();
+
+        public SerializedStroke()
+        {
+        }
+
+        public SerializedStroke(Vector3[] stroke)
+        {
+            points.AddRange(stroke);
+        }
+
+        public Vector3[] ToArray()
+        {
+            return points != null ? points.ToArray() : new Vector3[0];
         }
     }
 }

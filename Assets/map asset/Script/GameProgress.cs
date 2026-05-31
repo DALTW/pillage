@@ -92,6 +92,7 @@ public static class GameProgress
     public static bool HasColoredWaterBlue { get; private set; }
     public static bool HasInspectedFourthForestRiver { get; private set; }
     public static bool HasBuiltFourthForestRootBridge { get; private set; }
+    public static bool HasCompletedOutsideMapIntro { get; private set; }
 
     public static bool HasCompletedLetter => AvailableLetterFragmentCount >= RequiredLetterFragmentCount;
     public static bool CanCatchLetterBottle => HasMetQuestNpc && !HasCollectedBottleLetterFragment;
@@ -162,8 +163,7 @@ public static class GameProgress
         Reset();
     }
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    private static void ResetBeforeSceneLoad()
+    public static void ResetForNewGame()
     {
         Reset();
     }
@@ -231,6 +231,7 @@ public static class GameProgress
         HasColoredWaterBlue = false;
         HasInspectedFourthForestRiver = false;
         HasBuiltFourthForestRootBridge = false;
+        HasCompletedOutsideMapIntro = false;
 
         for (int i = 0; i < InteractedMoleHoles.Length; i++)
         {
@@ -246,6 +247,11 @@ public static class GameProgress
     public static void PlaySketchbookDrawing()
     {
         HasPlayedSketchbookDrawing = true;
+    }
+
+    public static void CompleteOutsideMapIntro()
+    {
+        HasCompletedOutsideMapIntro = true;
     }
 
     public static void MeetQuestNpc()

@@ -52,6 +52,7 @@ public class StartScreenController : MonoBehaviour
     {
         ShowLoadingCover();
         yield return null;
+        GameProgress.ResetForNewGame();
         SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
     }
 
