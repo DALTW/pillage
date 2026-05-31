@@ -1,8 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[ExecuteAlways]
 public class SketchWorldLineDrawing : MonoBehaviour
 {
+    private const string GeneratedStrokePrefix = "GeneratedSketchStroke_";
+
     private static readonly List<SketchWorldLineDrawing> ActiveDrawings = new List<SketchWorldLineDrawing>();
     private static float globalLineWidthMultiplier = 1f;
 
@@ -17,6 +20,9 @@ public class SketchWorldLineDrawing : MonoBehaviour
     private readonly List<LineRenderer> renderers = new List<LineRenderer>();
     private Material lineMaterial;
     private float totalLength;
+
+    private static bool UsesEditorPreviewObjects => !Application.isPlaying;
+    private static HideFlags EditorPreviewHideFlags => HideFlags.HideInHierarchy | HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
 
     public float RevealProgress
     {
@@ -62,6 +68,29 @@ public class SketchWorldLineDrawing : MonoBehaviour
         ActiveDrawings.Remove(this);
     }
 
+    private void OnValidate()
+    {
+        lineWidth = Mathf.Max(0.01f, lineWidth);
+        revealProgress = Mathf.Clamp01(revealProgress);
+
+        if (!isActiveAndEnabled)
+        {
+            return;
+        }
+
+        RebuildStrokesFromSerializedDataIfNeeded();
+
+        for (int i = 0; i < renderers.Count; i++)
+        {
+            if (renderers[i] != null)
+            {
+                ConfigureRenderer(renderers[i]);
+            }
+        }
+
+        UpdateRenderers();
+    }
+
     public void Configure(float width, Color color, int order)
     {
         lineWidth = Mathf.Max(0.01f, width);
@@ -102,7 +131,7 @@ public class SketchWorldLineDrawing : MonoBehaviour
             totalLength += length;
             serializedStrokes.Add(new SerializedStroke(copy));
 
-            LineRenderer lineRenderer = CreateRenderer($"GeneratedSketchStroke_{renderers.Count:00}");
+            LineRenderer lineRenderer = CreateRenderer($"{GeneratedStrokePrefix}{renderers.Count:00}");
             renderers.Add(lineRenderer);
         }
 
@@ -156,7 +185,7 @@ public class SketchWorldLineDrawing : MonoBehaviour
             strokeLengths.Add(length);
             totalLength += length;
 
-            LineRenderer lineRenderer = CreateRenderer($"GeneratedSketchStroke_{renderers.Count:00}");
+            LineRenderer lineRenderer = CreateRenderer($"{GeneratedStrokePrefix}{renderers.Count:00}");
             renderers.Add(lineRenderer);
         }
 
@@ -168,7 +197,7 @@ public class SketchWorldLineDrawing : MonoBehaviour
         for (int i = transform.childCount - 1; i >= 0; i--)
         {
             Transform child = transform.GetChild(i);
-            if (child != null && child.name.StartsWith("GeneratedSketchStroke_"))
+            if (child != null && child.name.StartsWith(GeneratedStrokePrefix))
             {
                 DestroyUnityObject(child.gameObject);
             }
@@ -178,9 +207,15 @@ public class SketchWorldLineDrawing : MonoBehaviour
     private LineRenderer CreateRenderer(string objectName)
     {
         GameObject lineObject = new GameObject(objectName);
+        if (UsesEditorPreviewObjects)
+        {
+            lineObject.hideFlags = EditorPreviewHideFlags;
+        }
+
         lineObject.transform.SetParent(transform, false);
 
         LineRenderer lineRenderer = lineObject.AddComponent<LineRenderer>();
+        lineRenderer.hideFlags = UsesEditorPreviewObjects ? EditorPreviewHideFlags : HideFlags.None;
         ConfigureRenderer(lineRenderer);
         return lineRenderer;
     }
@@ -225,6 +260,11 @@ public class SketchWorldLineDrawing : MonoBehaviour
 
         Shader shader = Shader.Find("Sprites/Default");
         lineMaterial = new Material(shader);
+        if (UsesEditorPreviewObjects)
+        {
+            lineMaterial.hideFlags = HideFlags.HideAndDontSave;
+        }
+
         lineMaterial.color = lineColor;
     }
 

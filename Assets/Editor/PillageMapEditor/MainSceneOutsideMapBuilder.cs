@@ -37,6 +37,17 @@ public static class MainSceneOutsideMapBuilder
             }
         }
 
+        if (!Application.isBatchMode
+            && transition.transform.Find("GeneratedSketchOutsideContent") != null
+            && !EditorUtility.DisplayDialog(
+                "Rebuild MainScene Outside Map",
+                "This will replace the existing baked outside map hierarchy in MainScene.",
+                "Rebuild",
+                "Cancel"))
+        {
+            return;
+        }
+
         transition.RebuildMainSceneOutsideMapForEditor();
 
         if (!File.Exists(MainScenePath))

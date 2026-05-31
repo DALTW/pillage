@@ -168,6 +168,87 @@ public static class GameProgress
         Reset();
     }
 
+#if UNITY_EDITOR
+    public struct EditorProgressSnapshot
+    {
+        public bool HasCompletedOutsideMapIntro;
+        public bool HasDrawnForestSketch;
+        public bool HasDrawnDeepForestSketch;
+        public bool HasDrawnFourthForestSketch;
+        public bool HasCollectedGreenCrayon;
+        public bool HasUsedGreenCrayon;
+        public bool HasColoredVillageGreen;
+        public bool HasCollectedBrownCrayon;
+        public bool HasUsedBrownCrayon;
+        public bool HasColoredBrownDetails;
+        public bool HasCollectedBlueCrayon;
+        public bool HasUsedBlueCrayon;
+        public bool HasColoredWaterBlue;
+        public bool HasInspectedFourthForestRiver;
+        public bool HasBuiltFourthForestRootBridge;
+    }
+
+    public static EditorProgressSnapshot CaptureEditorProgressSnapshot()
+    {
+        return new EditorProgressSnapshot
+        {
+            HasCompletedOutsideMapIntro = HasCompletedOutsideMapIntro,
+            HasDrawnForestSketch = HasDrawnForestSketch,
+            HasDrawnDeepForestSketch = HasDrawnDeepForestSketch,
+            HasDrawnFourthForestSketch = HasDrawnFourthForestSketch,
+            HasCollectedGreenCrayon = HasCollectedGreenCrayon,
+            HasUsedGreenCrayon = HasUsedGreenCrayon,
+            HasColoredVillageGreen = HasColoredVillageGreen,
+            HasCollectedBrownCrayon = HasCollectedBrownCrayon,
+            HasUsedBrownCrayon = HasUsedBrownCrayon,
+            HasColoredBrownDetails = HasColoredBrownDetails,
+            HasCollectedBlueCrayon = HasCollectedBlueCrayon,
+            HasUsedBlueCrayon = HasUsedBlueCrayon,
+            HasColoredWaterBlue = HasColoredWaterBlue,
+            HasInspectedFourthForestRiver = HasInspectedFourthForestRiver,
+            HasBuiltFourthForestRootBridge = HasBuiltFourthForestRootBridge
+        };
+    }
+
+    public static void ApplyFullStaticMapEditorState()
+    {
+        HasCompletedOutsideMapIntro = true;
+        HasDrawnForestSketch = true;
+        HasDrawnDeepForestSketch = true;
+        HasDrawnFourthForestSketch = true;
+        HasCollectedGreenCrayon = true;
+        HasUsedGreenCrayon = true;
+        HasColoredVillageGreen = true;
+        HasCollectedBrownCrayon = true;
+        HasUsedBrownCrayon = true;
+        HasColoredBrownDetails = true;
+        HasCollectedBlueCrayon = true;
+        HasUsedBlueCrayon = true;
+        HasColoredWaterBlue = true;
+        HasInspectedFourthForestRiver = true;
+        HasBuiltFourthForestRootBridge = true;
+    }
+
+    public static void RestoreEditorProgressSnapshot(EditorProgressSnapshot snapshot)
+    {
+        HasCompletedOutsideMapIntro = snapshot.HasCompletedOutsideMapIntro;
+        HasDrawnForestSketch = snapshot.HasDrawnForestSketch;
+        HasDrawnDeepForestSketch = snapshot.HasDrawnDeepForestSketch;
+        HasDrawnFourthForestSketch = snapshot.HasDrawnFourthForestSketch;
+        HasCollectedGreenCrayon = snapshot.HasCollectedGreenCrayon;
+        HasUsedGreenCrayon = snapshot.HasUsedGreenCrayon;
+        HasColoredVillageGreen = snapshot.HasColoredVillageGreen;
+        HasCollectedBrownCrayon = snapshot.HasCollectedBrownCrayon;
+        HasUsedBrownCrayon = snapshot.HasUsedBrownCrayon;
+        HasColoredBrownDetails = snapshot.HasColoredBrownDetails;
+        HasCollectedBlueCrayon = snapshot.HasCollectedBlueCrayon;
+        HasUsedBlueCrayon = snapshot.HasUsedBlueCrayon;
+        HasColoredWaterBlue = snapshot.HasColoredWaterBlue;
+        HasInspectedFourthForestRiver = snapshot.HasInspectedFourthForestRiver;
+        HasBuiltFourthForestRootBridge = snapshot.HasBuiltFourthForestRootBridge;
+    }
+#endif
+
     private static void Reset()
     {
         HasCheckedSketchbook = false;

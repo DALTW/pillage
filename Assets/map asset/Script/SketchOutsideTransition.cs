@@ -218,6 +218,9 @@ public class SketchOutsideTransition : MonoBehaviour
     private bool hasCreatedFourthForestExtension;
     private bool hasCreatedVillageForestGateColliders;
     private bool hasAppliedVillageGreenColoring;
+    private bool usesSceneAuthoredMap;
+    private readonly List<OutsideMapRegion> sceneRegions = new List<OutsideMapRegion>();
+    private readonly List<OutsideMapVariantLayer> sceneVariantLayers = new List<OutsideMapVariantLayer>();
 
     private sealed class MapRevealItem
     {
@@ -339,6 +342,12 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         transition.EnsureSetup();
+        if (transition.usesSceneAuthoredMap)
+        {
+            transition.ApplySceneAuthoredMapProgressState();
+            return;
+        }
+
         transition.EnsureForestExtensionCreated();
     }
 
@@ -350,6 +359,12 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         transition.EnsureSetup();
+        if (transition.usesSceneAuthoredMap)
+        {
+            transition.ApplySceneAuthoredMapProgressState();
+            return;
+        }
+
         transition.EnsureDeepForestExtensionCreated();
     }
 
@@ -361,6 +376,12 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         transition.EnsureSetup();
+        if (transition.usesSceneAuthoredMap)
+        {
+            transition.ApplySceneAuthoredMapProgressState();
+            return;
+        }
+
         transition.EnsureFourthForestExtensionCreated();
     }
 
@@ -372,6 +393,12 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         transition.EnsureSetup();
+        if (transition.usesSceneAuthoredMap)
+        {
+            transition.ApplySceneAuthoredMapProgressState();
+            return;
+        }
+
         transition.EnsureVillageGreenColoringApplied();
     }
 
@@ -383,6 +410,12 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         transition.EnsureSetup();
+        if (transition.usesSceneAuthoredMap)
+        {
+            transition.ApplySceneAuthoredMapProgressState();
+            return;
+        }
+
         transition.EnsureBrownColoringApplied();
     }
 
@@ -394,6 +427,12 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         transition.EnsureSetup();
+        if (transition.usesSceneAuthoredMap)
+        {
+            transition.ApplySceneAuthoredMapProgressState();
+            return;
+        }
+
         transition.EnsureBlueWaterColoringApplied();
     }
 
@@ -405,6 +444,12 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         transition.EnsureSetup();
+        if (transition.usesSceneAuthoredMap)
+        {
+            yield return transition.PlaySceneAuthoredRootBridgeRoutine();
+            yield break;
+        }
+
         yield return transition.PlayFourthForestRootBridgeRoutine();
     }
 
@@ -464,6 +509,8 @@ public class SketchOutsideTransition : MonoBehaviour
 #if UNITY_EDITOR
     public void RebuildMainSceneOutsideMapForEditor()
     {
+        GameProgress.EditorProgressSnapshot progressSnapshot = GameProgress.CaptureEditorProgressSnapshot();
+
         if (contentRoot != null)
         {
             DestroyImmediate(contentRoot);
@@ -499,38 +546,373 @@ public class SketchOutsideTransition : MonoBehaviour
         hasCreatedFourthForestExtension = false;
         hasCreatedVillageForestGateColliders = false;
         hasAppliedVillageGreenColoring = false;
+        usesSceneAuthoredMap = false;
+        sceneRegions.Clear();
+        sceneVariantLayers.Clear();
 
-        EnsureSetup();
+        try
+        {
+            GameProgress.ApplyFullStaticMapEditorState();
+            EnsureSetup();
 
-        transform.position = Vector3.zero;
-        contentRoot.SetActive(true);
-        contentRoot.transform.localPosition = Vector3.zero;
-        backgroundRenderer.transform.localPosition = GetBackgroundLocalPosition();
-        backgroundRenderer.transform.localScale = GetBackgroundFinalScale();
-        houseDrawing.RevealProgress = 1f;
+            transform.position = Vector3.zero;
+            contentRoot.SetActive(true);
+            contentRoot.transform.localPosition = Vector3.zero;
+            backgroundRenderer.transform.localPosition = GetBackgroundLocalPosition();
+            backgroundRenderer.transform.localScale = GetBackgroundFinalScale();
+            houseDrawing.RevealProgress = 1f;
+
+            if (propRoot != null)
+            {
+                propRoot.SetActive(true);
+            }
+
+            for (int i = 0; i < mapRevealItems.Count; i++)
+            {
+                mapRevealItems[i].ApplyProgress(1f);
+            }
+
+            if (houseDoorCollider != null)
+            {
+                houseDoorCollider.enabled = true;
+            }
+
+            if (houseDoorInteract != null)
+            {
+                houseDoorInteract.SetInteractionEnabled(true);
+            }
+
+            BuildStaticMapSceneMetadataForEditor();
+            SyncOutsideMapRootMetadata();
+            EditorUtility.SetDirty(this);
+        }
+        finally
+        {
+            GameProgress.RestoreEditorProgressSnapshot(progressSnapshot);
+        }
+    }
+
+    private void BuildStaticMapSceneMetadataForEditor()
+    {
+        if (contentRoot == null)
+        {
+            return;
+        }
 
         if (propRoot != null)
         {
-            propRoot.SetActive(true);
+            Transform villageGroup = GetOrCreateRegionGroup("Village", OutsideMapActivationCondition.Always);
+            Transform forestGroup = GetOrCreateRegionGroup("Forest", OutsideMapActivationCondition.ForestSketch);
+            Transform deepForestGroup = GetOrCreateRegionGroup("DeepForest", OutsideMapActivationCondition.DeepForestSketch);
+            Transform fourthForestGroup = GetOrCreateRegionGroup("FourthForest", OutsideMapActivationCondition.FourthForestSketch);
+            Transform boundariesGroup = GetOrCreateRegionGroup("Boundaries", OutsideMapActivationCondition.Always);
+            GetOrCreateRegionGroup("Decorations", OutsideMapActivationCondition.Always);
+            GetOrCreateRegionGroup("QuestObjects", OutsideMapActivationCondition.Always);
+
+            List<Transform> childrenToGroup = new List<Transform>();
+            for (int i = 0; i < propRoot.transform.childCount; i++)
+            {
+                Transform child = propRoot.transform.GetChild(i);
+                if (child.GetComponent<OutsideMapRegion>() == null)
+                {
+                    childrenToGroup.Add(child);
+                }
+            }
+
+            for (int i = 0; i < childrenToGroup.Count; i++)
+            {
+                Transform child = childrenToGroup[i];
+                Transform targetGroup = GetGroupForEditorObject(child, villageGroup, forestGroup, deepForestGroup, fourthForestGroup, boundariesGroup);
+                child.SetParent(targetGroup, true);
+            }
         }
 
-        for (int i = 0; i < mapRevealItems.Count; i++)
+        ParentStaticVariantLayersForEditor();
+
+        OutsideMapObject[] existingMetadata = contentRoot.GetComponentsInChildren<OutsideMapObject>(true);
+        for (int i = 0; i < existingMetadata.Length; i++)
         {
-            mapRevealItems[i].ApplyProgress(1f);
+            if (existingMetadata[i] != null)
+            {
+                DestroyImmediate(existingMetadata[i]);
+            }
         }
 
-        if (houseDoorCollider != null)
+        OutsideMapVariantLayer[] existingVariants = contentRoot.GetComponentsInChildren<OutsideMapVariantLayer>(true);
+        for (int i = 0; i < existingVariants.Length; i++)
         {
-            houseDoorCollider.enabled = true;
+            if (existingVariants[i] != null)
+            {
+                DestroyImmediate(existingVariants[i]);
+            }
         }
 
-        if (houseDoorInteract != null)
+        Transform[] transforms = contentRoot.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < transforms.Length; i++)
         {
-            houseDoorInteract.SetInteractionEnabled(true);
+            Transform mapTransform = transforms[i];
+            if (mapTransform == contentRoot.transform || mapTransform.GetComponent<OutsideMapRegion>() != null)
+            {
+                continue;
+            }
+
+            if (ShouldAddMapObjectMetadata(mapTransform))
+            {
+                ConfigureMapObjectMetadataForEditor(mapTransform);
+            }
+
+            ConfigureVariantLayerForEditor(mapTransform);
         }
 
-        SyncOutsideMapRootMetadata();
-        EditorUtility.SetDirty(this);
+        RefreshSceneAuthoredMapCollections();
+    }
+
+    private void ParentStaticVariantLayersForEditor()
+    {
+        Transform[] transforms = contentRoot.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform variantTransform = transforms[i];
+            if (!TryGetVariantLayerInfo(variantTransform.name, out _, out _)
+                || !TryGetVariantSourceNameForEditor(variantTransform.name, out string sourceName))
+            {
+                continue;
+            }
+
+            Transform sourceTransform = FindChildRecursive(contentRoot.transform, sourceName);
+            if (sourceTransform == null || sourceTransform == variantTransform || variantTransform.IsChildOf(sourceTransform))
+            {
+                continue;
+            }
+
+            variantTransform.SetParent(sourceTransform, true);
+        }
+    }
+
+    private static bool TryGetVariantSourceNameForEditor(string variantName, out string sourceName)
+    {
+        sourceName = null;
+
+        if (variantName == "GeneratedOutsideHouseBrownOverlay")
+        {
+            sourceName = "GeneratedOutsideHouseLineDrawing";
+            return true;
+        }
+
+        if (variantName == "GeneratedNeighborHouseBrownOverlay")
+        {
+            sourceName = "GeneratedNeighborHouseWithMailbox";
+            return true;
+        }
+
+        if (variantName == "GeneratedForestEntranceGreenLeaves" || variantName == "GeneratedForestEntranceBrownTrunks")
+        {
+            sourceName = "GeneratedForestEntranceLineDrawing";
+            return true;
+        }
+
+        if (variantName == "GeneratedPondBlueWaterOverlay")
+        {
+            sourceName = "GeneratedPondLineDrawing";
+            return true;
+        }
+
+        if (variantName == "GeneratedForestWellBlueWaterOverlay")
+        {
+            sourceName = "GeneratedForestWellLineDrawing";
+            return true;
+        }
+
+        if (variantName.StartsWith("GeneratedOutsideFenceBrown_"))
+        {
+            sourceName = variantName.Replace("GeneratedOutsideFenceBrown_", "GeneratedOutsideFence_");
+            return true;
+        }
+
+        const string brownOverlaySuffix = "_BrownOverlay";
+        if (variantName.EndsWith(brownOverlaySuffix))
+        {
+            sourceName = variantName.Substring(0, variantName.Length - brownOverlaySuffix.Length);
+            return true;
+        }
+
+        return false;
+    }
+
+    private Transform GetOrCreateRegionGroup(string regionId, OutsideMapActivationCondition activationCondition)
+    {
+        Transform existingGroup = propRoot.transform.Find(regionId);
+        GameObject groupObject = existingGroup != null
+            ? existingGroup.gameObject
+            : new GameObject(regionId);
+
+        if (existingGroup == null)
+        {
+            groupObject.transform.SetParent(propRoot.transform, false);
+        }
+
+        OutsideMapRegion region = groupObject.GetComponent<OutsideMapRegion>();
+        if (region == null)
+        {
+            region = groupObject.AddComponent<OutsideMapRegion>();
+        }
+
+        region.Configure(regionId, activationCondition);
+        groupObject.SetActive(true);
+        return groupObject.transform;
+    }
+
+    private Transform GetGroupForEditorObject(
+        Transform objectTransform,
+        Transform villageGroup,
+        Transform forestGroup,
+        Transform deepForestGroup,
+        Transform fourthForestGroup,
+        Transform boundariesGroup)
+    {
+        if (objectTransform == boundaryRoot || objectTransform.GetComponentInChildren<Collider2D>(true) != null && objectTransform.name.Contains("Boundary"))
+        {
+            return boundariesGroup;
+        }
+
+        string region = InferRegion(GetPropRootLocalPosition(objectTransform));
+        switch (region)
+        {
+            case "FourthForest":
+                return fourthForestGroup;
+            case "DeepForest":
+                return deepForestGroup;
+            case "Forest":
+                return forestGroup;
+            default:
+                return villageGroup;
+        }
+    }
+
+    private bool ShouldAddMapObjectMetadata(Transform mapTransform)
+    {
+        return mapTransform.GetComponent<SketchWorldLineDrawing>() != null
+            || mapTransform.GetComponent<SpriteRenderer>() != null
+            || mapTransform.GetComponent<Collider2D>() != null
+            || mapTransform.GetComponent<OutsideMapRevealTarget>() != null
+            || mapTransform.GetComponent<IInteractable>() != null;
+    }
+
+    private void ConfigureMapObjectMetadataForEditor(Transform mapTransform)
+    {
+        OutsideMapObject mapObject = mapTransform.GetComponent<OutsideMapObject>();
+        if (mapObject == null)
+        {
+            mapObject = mapTransform.gameObject.AddComponent<OutsideMapObject>();
+        }
+
+        string objectName = mapTransform.name;
+        OutsideMapRevealTarget revealTarget = mapTransform.GetComponent<OutsideMapRevealTarget>();
+        float revealDistance = revealTarget != null ? revealTarget.RevealDistance : MapRevealDistance;
+        mapObject.Configure(
+            objectName,
+            InferObjectType(objectName),
+            InferRegion(GetPropRootLocalPosition(mapTransform)),
+            true,
+            GetSortingOrderForEditor(mapTransform),
+            ResolvePlacementPromptDistance(objectName, 0f),
+            revealDistance,
+            OutsideMapObjectRuntimeState.Reveal);
+    }
+
+    private void ConfigureVariantLayerForEditor(Transform mapTransform)
+    {
+        if (!TryGetVariantLayerInfo(mapTransform.name, out OutsideMapVariantType variantType, out OutsideMapActivationCondition activationCondition))
+        {
+            return;
+        }
+
+        OutsideMapVariantLayer variantLayer = mapTransform.GetComponent<OutsideMapVariantLayer>();
+        if (variantLayer == null)
+        {
+            variantLayer = mapTransform.gameObject.AddComponent<OutsideMapVariantLayer>();
+        }
+
+        variantLayer.Configure(variantType, activationCondition, true);
+        mapTransform.gameObject.SetActive(true);
+    }
+
+    private static bool TryGetVariantLayerInfo(string objectName, out OutsideMapVariantType variantType, out OutsideMapActivationCondition activationCondition)
+    {
+        variantType = OutsideMapVariantType.QuestState;
+        activationCondition = OutsideMapActivationCondition.Always;
+
+        if (objectName.Contains("RootBridge"))
+        {
+            variantType = OutsideMapVariantType.Bridge;
+            activationCondition = OutsideMapActivationCondition.RootBridgeBuilt;
+            return true;
+        }
+
+        if (objectName.Contains("Green"))
+        {
+            variantType = OutsideMapVariantType.Green;
+            activationCondition = OutsideMapActivationCondition.VillageGreenColored;
+            return true;
+        }
+
+        if (objectName.Contains("Brown"))
+        {
+            variantType = OutsideMapVariantType.Brown;
+            activationCondition = OutsideMapActivationCondition.BrownDetailsColored;
+            return true;
+        }
+
+        if (objectName.Contains("Blue") || objectName.Contains("RiverBlueWater") || objectName == "GeneratedFourthForestIslandDoor")
+        {
+            variantType = OutsideMapVariantType.Blue;
+            activationCondition = OutsideMapActivationCondition.WaterBlueColored;
+            return true;
+        }
+
+        if (objectName.Contains("Reward") || objectName.Contains("Crayon") || objectName.Contains("GlowingLeaf"))
+        {
+            variantType = OutsideMapVariantType.Reward;
+            activationCondition = OutsideMapActivationCondition.Always;
+            return true;
+        }
+
+        return false;
+    }
+
+    private Vector3 GetPropRootLocalPosition(Transform objectTransform)
+    {
+        if (objectTransform == null)
+        {
+            return Vector3.zero;
+        }
+
+        if (propRoot != null)
+        {
+            return propRoot.transform.InverseTransformPoint(objectTransform.position);
+        }
+
+        return contentRoot != null
+            ? contentRoot.transform.InverseTransformPoint(objectTransform.position)
+            : objectTransform.localPosition;
+    }
+
+    private static int GetSortingOrderForEditor(Transform mapTransform)
+    {
+        SpriteRenderer spriteRenderer = mapTransform.GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            return spriteRenderer.sortingOrder;
+        }
+
+        LineRenderer lineRenderer = mapTransform.GetComponentInChildren<LineRenderer>(true);
+        if (lineRenderer != null)
+        {
+            return lineRenderer.sortingOrder;
+        }
+
+        Renderer renderer = mapTransform.GetComponent<Renderer>();
+        return renderer != null ? renderer.sortingOrder : 0;
     }
 #endif
 
@@ -776,6 +1158,11 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         UpdateMapRevealItems(outsidePlayer.position);
+        if (usesSceneAuthoredMap)
+        {
+            SyncActiveSceneVariantLayerRevealProgress();
+        }
+
         UpdateQuestNpcPrompt();
     }
 
@@ -817,22 +1204,39 @@ public class SketchOutsideTransition : MonoBehaviour
 
         ApplyOutsideCameraSize();
         SnapCameraToPlayer(player);
-        houseDoorInteract.Configure(
-            this,
-            Vector3.zero,
-            ResolvePlacementPromptDistance("GeneratedOutsideHouseDoor", 1.6f));
+        if (houseDoorInteract != null)
+        {
+            houseDoorInteract.Configure(
+                this,
+                Vector3.zero,
+                ResolvePlacementPromptDistance("GeneratedOutsideHouseDoor", 1.6f));
+        }
 
         SetPlayerMovementEnabled(player, false);
         hasCompletedOutsideMap = GameProgress.HasCompletedOutsideMapIntro;
 
         if (hasCompletedOutsideMap)
         {
-            SetCompletedOutsideMapState();
+            if (usesSceneAuthoredMap)
+            {
+                SetCompletedSceneAuthoredMapState();
+            }
+            else
+            {
+                SetCompletedOutsideMapState();
+            }
             yield return SlideMapIntoPlace();
         }
         else
         {
-            SetInitialOutsideMapState();
+            if (usesSceneAuthoredMap)
+            {
+                SetInitialSceneAuthoredMapState();
+            }
+            else
+            {
+                SetInitialOutsideMapState();
+            }
 
             yield return SlideMapIntoPlace();
             yield return RevealWhiteBackground();
@@ -841,6 +1245,11 @@ public class SketchOutsideTransition : MonoBehaviour
             if (propRoot != null)
             {
                 propRoot.SetActive(true);
+                if (usesSceneAuthoredMap)
+                {
+                    ApplySceneAuthoredMapProgressState();
+                }
+
                 UpdateMapRevealItems(player.transform.position);
                 UpdateQuestNpcPrompt();
             }
@@ -849,8 +1258,15 @@ public class SketchOutsideTransition : MonoBehaviour
             GameProgress.CompleteOutsideMapIntro();
         }
 
-        houseDoorCollider.enabled = true;
-        houseDoorInteract.SetInteractionEnabled(true);
+        if (houseDoorCollider != null)
+        {
+            houseDoorCollider.enabled = true;
+        }
+
+        if (houseDoorInteract != null)
+        {
+            houseDoorInteract.SetInteractionEnabled(true);
+        }
         isOutsideActive = true;
         SetPlayerMovementEnabled(player, true);
         transitionRoutine = null;
@@ -1333,18 +1749,19 @@ public class SketchOutsideTransition : MonoBehaviour
     {
         if (contentRoot == null && TryBindExistingSceneContent())
         {
-            EnsureForestExtensionCreated();
-            EnsureDeepForestState();
-            EnsureFourthForestState();
-            EnsureVillageGreenColoringApplied();
-            EnsureBrownColoringApplied();
-            EnsureBlueWaterColoringApplied();
+            ApplySceneAuthoredMapProgressState();
             return;
         }
 
         if (contentRoot != null)
         {
             RestoreMapRevealItemsFromSceneIfNeeded();
+            if (usesSceneAuthoredMap)
+            {
+                ApplySceneAuthoredMapProgressState();
+                return;
+            }
+
             EnsureForestExtensionCreated();
             EnsureDeepForestState();
             EnsureFourthForestState();
@@ -1380,10 +1797,11 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         contentRoot = existingContentRoot.gameObject;
-        backgroundRenderer = FindChildComponent<SpriteRenderer>(contentRoot.transform, "GeneratedWhiteOutsideBackground");
-        houseDrawing = FindChildComponent<SketchWorldLineDrawing>(contentRoot.transform, "GeneratedOutsideHouseLineDrawing");
+        usesSceneAuthoredMap = true;
+        backgroundRenderer = FindChildComponentRecursive<SpriteRenderer>(contentRoot.transform, "GeneratedWhiteOutsideBackground");
+        houseDrawing = FindChildComponentRecursive<SketchWorldLineDrawing>(contentRoot.transform, "GeneratedOutsideHouseLineDrawing");
 
-        Transform houseDoorTransform = contentRoot.transform.Find("GeneratedOutsideHouseDoor");
+        Transform houseDoorTransform = FindChildRecursive(contentRoot.transform, "GeneratedOutsideHouseDoor");
         if (houseDoorTransform != null)
         {
             houseDoorInteract = houseDoorTransform.GetComponent<SketchOutsideDoorInteract>();
@@ -1395,36 +1813,37 @@ public class SketchOutsideTransition : MonoBehaviour
 
         if (existingPropRoot != null)
         {
-            rightFenceDrawing = FindChildComponent<SketchWorldLineDrawing>(existingPropRoot, "GeneratedOutsideFence_Right");
-            questNpcDrawing = FindChildComponent<SketchWorldLineDrawing>(existingPropRoot, "GeneratedQuestGiverNpcLineDrawing");
+            rightFenceDrawing = FindChildComponentRecursive<SketchWorldLineDrawing>(existingPropRoot, "GeneratedOutsideFence_Right");
+            questNpcDrawing = FindChildComponentRecursive<SketchWorldLineDrawing>(existingPropRoot, "GeneratedQuestGiverNpcLineDrawing");
             questNpcRewardInteract = questNpcDrawing != null
                 ? questNpcDrawing.GetComponent<QuestNpcLetterRewardInteract>()
                 : null;
-            questNpcPondGuideDrawing = FindChildComponent<SketchWorldLineDrawing>(existingPropRoot, "GeneratedQuestNpcPondGuide");
+            questNpcPondGuideDrawing = FindChildComponentRecursive<SketchWorldLineDrawing>(existingPropRoot, "GeneratedQuestNpcPondGuide");
 
             if (questNpcDrawing != null)
             {
                 Transform promptTransform = questNpcDrawing.transform.Find("GeneratedQuestNpcPrompt");
                 questNpcPromptObject = promptTransform != null ? promptTransform.gameObject : null;
-                questNpcPromptOuterGlowText = FindChildComponent<TextMesh>(promptTransform, "GeneratedQuestNpcPromptOuterGlow");
-                questNpcPromptInnerGlowText = FindChildComponent<TextMesh>(promptTransform, "GeneratedQuestNpcPromptInnerGlow");
-                questNpcPromptText = FindChildComponent<TextMesh>(promptTransform, "GeneratedQuestNpcPromptText");
+                questNpcPromptOuterGlowText = FindChildComponentRecursive<TextMesh>(promptTransform, "GeneratedQuestNpcPromptOuterGlow");
+                questNpcPromptInnerGlowText = FindChildComponentRecursive<TextMesh>(promptTransform, "GeneratedQuestNpcPromptInnerGlow");
+                questNpcPromptText = FindChildComponentRecursive<TextMesh>(promptTransform, "GeneratedQuestNpcPromptText");
             }
 
-            Transform existingBoundaryRoot = existingPropRoot.Find("GeneratedOutsideBoundaryColliders");
+            Transform existingBoundaryRoot = FindChildRecursive(existingPropRoot, "GeneratedOutsideBoundaryColliders");
             boundaryRoot = existingBoundaryRoot;
-            villageRightBoundaryCollider = FindChildComponent<BoxCollider2D>(existingBoundaryRoot, "GeneratedOutsideBoundary_Right");
-            forestRightBoundaryCollider = FindChildComponent<BoxCollider2D>(existingBoundaryRoot, "GeneratedForestExtensionBoundary_Right");
-            deepForestRightBoundaryCollider = FindChildComponent<BoxCollider2D>(existingBoundaryRoot, "GeneratedDeepForestExtensionBoundary_Right");
+            villageRightBoundaryCollider = FindChildComponentRecursive<BoxCollider2D>(existingBoundaryRoot, "GeneratedOutsideBoundary_Right");
+            forestRightBoundaryCollider = FindChildComponentRecursive<BoxCollider2D>(existingBoundaryRoot, "GeneratedForestExtensionBoundary_Right");
+            deepForestRightBoundaryCollider = FindChildComponentRecursive<BoxCollider2D>(existingBoundaryRoot, "GeneratedDeepForestExtensionBoundary_Right");
 
-            hasCreatedForestExtension = existingPropRoot.Find("GeneratedForestExtensionFence") != null;
-            hasCreatedDeepForestExtension = existingPropRoot.Find("GeneratedDeepForestExtensionFence") != null;
-            hasCreatedFourthForestExtension = existingPropRoot.Find("GeneratedFourthForestExtensionFence") != null;
+            hasCreatedForestExtension = FindChildRecursive(existingPropRoot, "GeneratedForestExtensionFence") != null;
+            hasCreatedDeepForestExtension = FindChildRecursive(existingPropRoot, "GeneratedDeepForestExtensionFence") != null;
+            hasCreatedFourthForestExtension = FindChildRecursive(existingPropRoot, "GeneratedFourthForestExtensionFence") != null;
             hasCreatedVillageForestGateColliders = existingBoundaryRoot != null
-                && existingBoundaryRoot.Find("GeneratedOutsideBoundary_RightGateTop") != null;
+                && FindChildRecursive(existingBoundaryRoot, "GeneratedOutsideBoundary_RightGateTop") != null;
             hasAppliedVillageGreenColoring = existingPropRoot.GetComponentInChildren<GrassCrayonColorOverlay>(true) != null;
         }
 
+        RefreshSceneAuthoredMapCollections();
         RestoreMapRevealItemsFromSceneIfNeeded();
         SyncOutsideMapRootMetadata();
         return true;
@@ -1439,6 +1858,36 @@ public class SketchOutsideTransition : MonoBehaviour
 
         Transform child = parent.Find(childName);
         return child != null ? child.GetComponent<T>() : null;
+    }
+
+    private static T FindChildComponentRecursive<T>(Transform parent, string childName) where T : Component
+    {
+        Transform child = FindChildRecursive(parent, childName);
+        return child != null ? child.GetComponent<T>() : null;
+    }
+
+    private static Transform FindChildRecursive(Transform parent, string childName)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        if (parent.name == childName)
+        {
+            return parent;
+        }
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform match = FindChildRecursive(parent.GetChild(i), childName);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private void RestoreMapRevealItemsFromSceneIfNeeded()
@@ -1485,6 +1934,264 @@ public class SketchOutsideTransition : MonoBehaviour
         {
             root.Configure(contentRoot, propRoot, boundaryRoot, this);
         }
+    }
+
+    private void RefreshSceneAuthoredMapCollections()
+    {
+        sceneRegions.Clear();
+        sceneVariantLayers.Clear();
+
+        if (contentRoot == null)
+        {
+            return;
+        }
+
+        sceneRegions.AddRange(contentRoot.GetComponentsInChildren<OutsideMapRegion>(true));
+        sceneVariantLayers.AddRange(contentRoot.GetComponentsInChildren<OutsideMapVariantLayer>(true));
+    }
+
+    private void ApplySceneAuthoredMapProgressState()
+    {
+        if (contentRoot == null)
+        {
+            return;
+        }
+
+        if (sceneRegions.Count == 0 && sceneVariantLayers.Count == 0)
+        {
+            RefreshSceneAuthoredMapCollections();
+        }
+
+        for (int i = 0; i < sceneRegions.Count; i++)
+        {
+            OutsideMapRegion region = sceneRegions[i];
+            if (region != null)
+            {
+                region.gameObject.SetActive(region.ShouldBeActive());
+            }
+        }
+
+        for (int i = 0; i < sceneVariantLayers.Count; i++)
+        {
+            OutsideMapVariantLayer variantLayer = sceneVariantLayers[i];
+            if (variantLayer == null)
+            {
+                continue;
+            }
+
+            variantLayer.gameObject.SetActive(variantLayer.ShouldBeActive());
+        }
+
+        ApplySceneAuthoredBoundaryState();
+        RestoreMapRevealItemsFromSceneIfNeeded();
+        SyncActiveSceneVariantLayerRevealProgress();
+        SyncOutsideMapRootMetadata();
+    }
+
+    private void SetInitialSceneAuthoredMapState()
+    {
+        contentRoot.transform.localPosition = MapSlideStartOffset;
+        backgroundRenderer.transform.localPosition = GetBackgroundLocalPosition();
+        backgroundRenderer.transform.localScale = new Vector3(0.01f, 0.01f, 1f);
+        backgroundRenderer.color = Color.white;
+
+        if (houseDrawing != null)
+        {
+            houseDrawing.RevealProgress = 0f;
+        }
+
+        if (houseDoorCollider != null)
+        {
+            houseDoorCollider.enabled = false;
+        }
+
+        if (houseDoorInteract != null)
+        {
+            houseDoorInteract.SetInteractionEnabled(false);
+        }
+
+        ApplySceneAuthoredMapProgressState();
+        ResetMapRevealItems();
+        SyncActiveSceneVariantLayerRevealProgress();
+
+        if (propRoot != null)
+        {
+            propRoot.SetActive(false);
+        }
+    }
+
+    private void SetCompletedSceneAuthoredMapState()
+    {
+        contentRoot.transform.localPosition = MapSlideStartOffset;
+        backgroundRenderer.transform.localPosition = GetBackgroundLocalPosition();
+        backgroundRenderer.transform.localScale = GetBackgroundFinalScale();
+        backgroundRenderer.color = Color.white;
+
+        if (houseDrawing != null)
+        {
+            houseDrawing.RevealProgress = 1f;
+        }
+
+        if (propRoot != null)
+        {
+            propRoot.SetActive(true);
+        }
+
+        ApplySceneAuthoredMapProgressState();
+        ApplyMapRevealItems();
+        SyncActiveSceneVariantLayerRevealProgress();
+
+        if (houseDoorCollider != null)
+        {
+            houseDoorCollider.enabled = true;
+        }
+
+        if (houseDoorInteract != null)
+        {
+            houseDoorInteract.SetInteractionEnabled(true);
+        }
+    }
+
+    private void SyncActiveSceneVariantLayerRevealProgress()
+    {
+        for (int i = 0; i < sceneVariantLayers.Count; i++)
+        {
+            OutsideMapVariantLayer variantLayer = sceneVariantLayers[i];
+            if (variantLayer != null && variantLayer.isActiveAndEnabled && variantLayer.RevealWithParent)
+            {
+                SyncVariantLayerRevealProgress(variantLayer.transform);
+            }
+        }
+    }
+
+    private void SyncVariantLayerRevealProgress(Transform variantTransform)
+    {
+        SketchWorldLineDrawing sourceDrawing = FindNearestParentLineDrawing(variantTransform);
+        if (sourceDrawing == null)
+        {
+            return;
+        }
+
+        float sourceProgress = sourceDrawing.RevealProgress;
+        SketchWorldLineDrawing[] variantDrawings = variantTransform.GetComponentsInChildren<SketchWorldLineDrawing>(true);
+        for (int i = 0; i < variantDrawings.Length; i++)
+        {
+            if (variantDrawings[i] != sourceDrawing)
+            {
+                variantDrawings[i].RevealProgress = sourceProgress;
+            }
+        }
+
+        SpriteRenderer[] spriteRenderers = variantTransform.GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < spriteRenderers.Length; i++)
+        {
+            Color color = spriteRenderers[i].color;
+            color.a = sourceProgress;
+            spriteRenderers[i].color = color;
+        }
+    }
+
+    private static SketchWorldLineDrawing FindNearestParentLineDrawing(Transform transformToCheck)
+    {
+        Transform current = transformToCheck != null ? transformToCheck.parent : null;
+
+        while (current != null)
+        {
+            SketchWorldLineDrawing drawing = current.GetComponent<SketchWorldLineDrawing>();
+            if (drawing != null)
+            {
+                return drawing;
+            }
+
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    private void ApplySceneAuthoredBoundaryState()
+    {
+        bool hasForest = GameProgress.HasDrawnForestSketch;
+        bool hasDeepForest = GameProgress.HasDrawnDeepForestSketch;
+        bool hasFourthForest = GameProgress.HasDrawnFourthForestSketch;
+        bool hasBlueWater = GameProgress.HasColoredWaterBlue && hasFourthForest;
+        bool hasRootBridge = GameProgress.HasBuiltFourthForestRootBridge;
+
+        SetSceneColliderEnabled("GeneratedOutsideBoundary_Right", !hasForest);
+        SetSceneColliderEnabled("GeneratedOutsideBoundary_RightGateTop", hasForest);
+        SetSceneColliderEnabled("GeneratedOutsideBoundary_RightGateBottom", hasForest);
+        SetSceneColliderEnabled("GeneratedForestExtensionBoundary_Right", hasForest && !hasDeepForest);
+        SetSceneColliderEnabled("GeneratedDeepForestExtensionBoundary_Right", hasDeepForest && !hasFourthForest);
+
+        SetSceneColliderEnabled("GeneratedFourthForestRiverBlocker", hasBlueWater && !hasRootBridge);
+        SetSceneColliderEnabled("GeneratedFourthForestRiverBlocker_Top", hasBlueWater && hasRootBridge);
+        SetSceneColliderEnabled("GeneratedFourthForestRiverBlocker_Bottom", hasBlueWater && hasRootBridge);
+        SetSceneColliderEnabled("GeneratedFourthForestRiverBlocker_Right", hasBlueWater && hasRootBridge);
+        SetSceneColliderEnabled("GeneratedFourthForestRiverBlocker_LeftTop", hasBlueWater && hasRootBridge);
+        SetSceneColliderEnabled("GeneratedFourthForestRiverBlocker_LeftBottom", hasBlueWater && hasRootBridge);
+    }
+
+    private void SetSceneColliderEnabled(string objectName, bool enabled)
+    {
+        Transform colliderTransform = FindChildRecursive(boundaryRoot != null ? boundaryRoot : contentRoot.transform, objectName);
+        if (colliderTransform == null)
+        {
+            return;
+        }
+
+        Collider2D[] colliders = colliderTransform.GetComponents<Collider2D>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            colliders[i].enabled = enabled;
+        }
+    }
+
+    private IEnumerator PlaySceneAuthoredRootBridgeRoutine()
+    {
+        if (!GameProgress.HasInspectedFourthForestRiver || GameProgress.HasBuiltFourthForestRootBridge)
+        {
+            yield break;
+        }
+
+        Transform bridgeTransform = FindChildRecursive(contentRoot != null ? contentRoot.transform : null, "GeneratedFourthForestRootBridge");
+        if (bridgeTransform == null)
+        {
+            GameProgress.BuildFourthForestRootBridge();
+            ApplySceneAuthoredMapProgressState();
+            yield break;
+        }
+
+        bridgeTransform.gameObject.SetActive(true);
+
+        SketchWorldLineDrawing[] bridgeDrawings = bridgeTransform.GetComponentsInChildren<SketchWorldLineDrawing>(true);
+        for (int i = 0; i < bridgeDrawings.Length; i++)
+        {
+            bridgeDrawings[i].RevealProgress = 0f;
+        }
+
+        const float growDuration = 1.34f;
+        float elapsed = 0f;
+
+        while (elapsed < growDuration)
+        {
+            elapsed += Time.deltaTime;
+            float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / growDuration));
+
+            for (int i = 0; i < bridgeDrawings.Length; i++)
+            {
+                bridgeDrawings[i].RevealProgress = progress;
+            }
+
+            yield return null;
+        }
+
+        for (int i = 0; i < bridgeDrawings.Length; i++)
+        {
+            bridgeDrawings[i].RevealProgress = 1f;
+        }
+
+        GameProgress.BuildFourthForestRootBridge();
+        ApplySceneAuthoredMapProgressState();
     }
 
     private void EnsureDeepForestState()
