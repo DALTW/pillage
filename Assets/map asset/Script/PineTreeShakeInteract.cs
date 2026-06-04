@@ -13,6 +13,8 @@ public class PineTreeShakeInteract : MonoBehaviour, IInteractable
     private const int DropSortingOrder = 68;
     private const int PromptSortingOrder = 70;
 
+    private static readonly Color DefaultPineconeColor = new Color32(92, 55, 25, 255);
+    private static readonly Color BrownCrayonPineconeColor = new Color32(139, 82, 39, 232);
     private static Sprite pixelSprite;
 
     private Transform player;
@@ -75,6 +77,18 @@ public class PineTreeShakeInteract : MonoBehaviour, IInteractable
         }
 
         EnsureAttachedPinecone(sortingOrder);
+        UpdateAttachedPineconeVisibility();
+    }
+
+    public void ApplyAttachedPineconeBrownColor(int sortingOrder)
+    {
+        if (!showAttachedPinecone)
+        {
+            return;
+        }
+
+        EnsureAttachedPinecone(sortingOrder);
+        ConfigureAttachedPineconeDrawing(sortingOrder);
         UpdateAttachedPineconeVisibility();
     }
 
@@ -232,7 +246,7 @@ public class PineTreeShakeInteract : MonoBehaviour, IInteractable
         SketchWorldLineDrawing drawing = dropObject.AddComponent<SketchWorldLineDrawing>();
         drawing.Configure(
             DropLineWidth,
-            new Color32(92, 55, 25, 255),
+            GetCurrentPineconeColor(),
             DropSortingOrder);
         drawing.SetStrokes(BuildPineconeStrokes());
         drawing.RevealProgress = 1f;
@@ -377,22 +391,34 @@ public class PineTreeShakeInteract : MonoBehaviour, IInteractable
             attachedPineconeObject.transform.localRotation = Quaternion.Euler(0f, 0f, -12f);
 
             SketchWorldLineDrawing drawing = attachedPineconeObject.AddComponent<SketchWorldLineDrawing>();
-            drawing.Configure(0.032f, new Color32(92, 55, 25, 255), sortingOrder);
+            drawing.Configure(0.032f, GetCurrentPineconeColor(), sortingOrder);
             drawing.SetStrokes(BuildAttachedPineconeStrokes());
             drawing.RevealProgress = 1f;
         }
         else
         {
-            SketchWorldLineDrawing drawing = attachedPineconeObject.GetComponent<SketchWorldLineDrawing>();
-            if (drawing != null)
-            {
-                drawing.Configure(0.032f, new Color32(92, 55, 25, 255), sortingOrder);
-            }
+            ConfigureAttachedPineconeDrawing(sortingOrder);
         }
 
         attachedPineconeObject.transform.localPosition = new Vector3(0.36f * treeScale, 1.58f * treeScale, 0f);
         attachedPineconeObject.transform.localScale = Vector3.one * Mathf.Max(0.82f, treeScale * 0.92f);
         attachedPineconeObject.SetActive(false);
+    }
+
+    private void ConfigureAttachedPineconeDrawing(int sortingOrder)
+    {
+        SketchWorldLineDrawing drawing = attachedPineconeObject != null
+            ? attachedPineconeObject.GetComponent<SketchWorldLineDrawing>()
+            : null;
+        if (drawing != null)
+        {
+            drawing.Configure(0.032f, GetCurrentPineconeColor(), sortingOrder);
+        }
+    }
+
+    private static Color GetCurrentPineconeColor()
+    {
+        return GameProgress.HasColoredBrownDetails ? BrownCrayonPineconeColor : DefaultPineconeColor;
     }
 
     private void UpdateAttachedPineconeVisibility()
