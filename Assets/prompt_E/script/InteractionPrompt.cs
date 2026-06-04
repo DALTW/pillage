@@ -17,9 +17,11 @@ public class InteractionPrompt : MonoBehaviour
     private const float CompletionGlowPulseSpeed = 4.8f;
 
     private GameObject simplePromptRoot;
+    private TextMesh promptShadowText;
     private TextMesh promptText;
     private TextMesh promptInnerGlowText;
     private TextMesh promptOuterGlowText;
+    private string currentPromptText = "E";
     private bool usesCompletionGlow;
 
     private void Start()
@@ -28,6 +30,15 @@ public class InteractionPrompt : MonoBehaviour
         CreateSimplePrompt();
 
         SetPromptVisible(false);
+    }
+
+    public void SetPromptText(string value)
+    {
+        currentPromptText = string.IsNullOrEmpty(value) ? "E" : value;
+        UpdatePromptText(promptShadowText);
+        UpdatePromptText(promptText);
+        UpdatePromptText(promptInnerGlowText);
+        UpdatePromptText(promptOuterGlowText);
     }
 
     private void Update()
@@ -103,7 +114,7 @@ public class InteractionPrompt : MonoBehaviour
         simplePromptRoot.transform.localRotation = Quaternion.identity;
         simplePromptRoot.transform.localScale = Vector3.one;
 
-        CreatePromptText("SimpleInteractionPromptShadow", promptShadowColor, promptShadowOffset, promptSortingOrder - 1);
+        promptShadowText = CreatePromptText("SimpleInteractionPromptShadow", promptShadowColor, promptShadowOffset, promptSortingOrder - 1);
 
         if (usesCompletionGlow)
         {
@@ -153,7 +164,7 @@ public class InteractionPrompt : MonoBehaviour
         textObject.transform.localScale = Vector3.one;
 
         TextMesh textMesh = textObject.AddComponent<TextMesh>();
-        textMesh.text = "E";
+        textMesh.text = currentPromptText;
         textMesh.anchor = TextAnchor.MiddleCenter;
         textMesh.alignment = TextAlignment.Center;
         textMesh.fontSize = promptFontSize;
@@ -163,6 +174,14 @@ public class InteractionPrompt : MonoBehaviour
         MeshRenderer meshRenderer = textObject.GetComponent<MeshRenderer>();
         meshRenderer.sortingOrder = sortingOrder;
         return textMesh;
+    }
+
+    private void UpdatePromptText(TextMesh textMesh)
+    {
+        if (textMesh != null)
+        {
+            textMesh.text = currentPromptText;
+        }
     }
 
     private void UpdatePromptPosition()
