@@ -21,6 +21,11 @@ public class OvalFenceLineRendererBuilder : MonoBehaviour
     public float railGap = 0.35f;
     public float railWidth = 0.04f;
 
+    [Header("Gate")]
+    public bool gateEnabled = true;
+    public float gateStartAngle = 80f;
+    public float gateEndAngle = 100f;
+
     [Header("Post")]
     public GameObject postPrefab;
     public Vector3 postPrefabScale = Vector3.one;
@@ -57,7 +62,20 @@ public class OvalFenceLineRendererBuilder : MonoBehaviour
         for (int i = 0; i < safePostCount; i++)
         {
             float t = Mathf.PI * 2f * i / safePostCount;
+            if (gateEnabled && IsAngleInGate(GetGateAngle(t)))
+            {
+                continue;
+            }
+
             CreatePost(i, t, GetPostAngle(t));
+        }
+
+        if (gateEnabled)
+        {
+            float gateStartT = GetTForGateAngle(gateStartAngle);
+            float gateEndT = GetTForGateAngle(gateEndAngle);
+            CreatePost("GatePost_Start", gateStartT, GetPostAngle(gateStartT));
+            CreatePost("GatePost_End", gateEndT, GetPostAngle(gateEndT));
         }
     }
 
@@ -67,8 +85,6 @@ public class OvalFenceLineRendererBuilder : MonoBehaviour
         LineRenderer lr = obj.AddComponent<LineRenderer>();
 
         lr.useWorldSpace = false;
-        lr.loop = true;
-        lr.positionCount = resolution;
 
         lr.widthMultiplier = railWidth;
         lr.numCapVertices = 2;
@@ -82,14 +98,42 @@ public class OvalFenceLineRendererBuilder : MonoBehaviour
             lr.sharedMaterial = lineMaterial;
         }
 
-        for (int i = 0; i < resolution; i++)
+        if (!gateEnabled)
         {
-            float t = Mathf.PI * 2f * i / resolution;
+            lr.loop = true;
+            lr.positionCount = resolution;
+
+            for (int i = 0; i < resolution; i++)
+            {
+                float t = Mathf.PI * 2f * i / resolution;
+                lr.SetPosition(i, GetEllipsePoint(t, normalOffset, yOffset));
+            }
+
+            return;
+        }
+
+        lr.loop = false;
+
+        float startT = GetTForGateAngle(gateStartAngle);
+        float endT = GetTForGateAngle(gateEndAngle);
+        float span = Mathf.Repeat(endT - startT, Mathf.PI * 2f);
+        int pointCount = Mathf.Max(2, Mathf.CeilToInt(resolution * span / (Mathf.PI * 2f)) + 1);
+        lr.positionCount = pointCount;
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            float progress = pointCount > 1 ? i / (float)(pointCount - 1) : 0f;
+            float t = startT + span * progress;
             lr.SetPosition(i, GetEllipsePoint(t, normalOffset, yOffset));
         }
     }
 
     private void CreatePost(int index, float t, float angle)
+    {
+        CreatePost("Post_" + index.ToString("00"), t, angle);
+    }
+
+    private void CreatePost(string postName, float t, float angle)
     {
         if (postPrefab == null)
         {
@@ -97,7 +141,7 @@ public class OvalFenceLineRendererBuilder : MonoBehaviour
         }
 
         Vector3 center = GetEllipsePoint(t, 0f, 0f);
-        GameObject post = CreateGeneratedPrefabObject("Post_" + index.ToString("00"));
+        GameObject post = CreateGeneratedPrefabObject(postName);
         post.transform.localPosition = center;
         post.transform.localRotation = Quaternion.Euler(0f, RemapPostAngleForEuler(angle), 0f);
         post.transform.localScale = postPrefabScale;
@@ -172,6 +216,32 @@ public class OvalFenceLineRendererBuilder : MonoBehaviour
     private float GetPostAngle(float t)
     {
         return Vector2.SignedAngle(Vector2.up, GetEllipseNormal(t));
+    }
+
+    private float GetGateAngle(float t)
+    {
+        return Mathf.Repeat(-GetPostAngle(t), 360f);
+    }
+
+    private float GetTForGateAngle(float gateAngle)
+    {
+        float radians = gateAngle * Mathf.Deg2Rad;
+        Vector2 normal = new Vector2(Mathf.Sin(radians), Mathf.Cos(radians));
+        return Mathf.Repeat(Mathf.Atan2(normal.y * radiusY, normal.x * radiusX), Mathf.PI * 2f);
+    }
+
+    private bool IsAngleInGate(float angle)
+    {
+        float normalizedAngle = Mathf.Repeat(angle, 360f);
+        float normalizedStart = Mathf.Repeat(gateStartAngle, 360f);
+        float normalizedEnd = Mathf.Repeat(gateEndAngle, 360f);
+
+        if (normalizedStart <= normalizedEnd)
+        {
+            return normalizedAngle >= normalizedStart && normalizedAngle <= normalizedEnd;
+        }
+
+        return normalizedAngle >= normalizedStart || normalizedAngle <= normalizedEnd;
     }
 
     private float RemapPostAngleForEuler(float angle)

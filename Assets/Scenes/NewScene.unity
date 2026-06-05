@@ -612,6 +612,9 @@ MonoBehaviour:
   postCount: 72
   railGap: 0.56
   railWidth: 0.04
+  gateEnabled: 1
+  gateStartAngle: 80
+  gateEndAngle: 100
   postPrefab: {fileID: 6254971883605576499, guid: 11c6221c540c1d142a1bc1ac67564c37, type: 3}
   postPrefabScale: {x: 1, y: 1, z: 1}
   lineMaterial: {fileID: 2100000, guid: 025a5085f80246f42b9bfb611179d727, type: 2}
