@@ -4,19 +4,20 @@ Shader "Pillage/OutsideMapEdgeFade"
     {
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
-        _FadeX ("Horizontal Fade", Range(0.0001, 0.5)) = 0.035
-        _FadeY ("Vertical Fade", Range(0.0001, 0.5)) = 0.08
-        _ProtectedLeftRatio ("Protected Left Ratio", Range(0, 1)) = 1
+        _EdgeFadeX ("Edge Fade X", Range(0,1)) = 0.05
+        _EdgeFadeY ("Edge Fade Y", Range(0,1)) = 0.05
+        _ProtectedLeftRatio ("Protected Left Ratio", Range(0,1)) = 1
     }
 
     SubShader
     {
         Tags
         {
-            "Queue" = "Transparent"
-            "IgnoreProjector" = "True"
-            "RenderType" = "Transparent"
-            "CanUseSpriteAtlas" = "True"
+            "Queue"="Transparent"
+            "IgnoreProjector"="True"
+            "RenderType"="Transparent"
+            "PreviewType"="Plane"
+            "CanUseSpriteAtlas"="True"
         }
 
         Cull Off
@@ -34,7 +35,7 @@ Shader "Pillage/OutsideMapEdgeFade"
             struct appdata_t
             {
                 float4 vertex : POSITION;
-                float4 color : COLOR;
+                fixed4 color : COLOR;
                 float2 texcoord : TEXCOORD0;
             };
 
@@ -47,28 +48,29 @@ Shader "Pillage/OutsideMapEdgeFade"
 
             sampler2D _MainTex;
             fixed4 _Color;
-            float _FadeX;
-            float _FadeY;
+            float _EdgeFadeX;
+            float _EdgeFadeY;
             float _ProtectedLeftRatio;
 
-            v2f vert(appdata_t v)
+            v2f vert(appdata_t input)
             {
-                v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.texcoord = v.texcoord;
-                o.color = v.color * _Color;
-                return o;
+                v2f output;
+                output.vertex = UnityObjectToClipPos(input.vertex);
+                output.texcoord = input.texcoord;
+                output.color = input.color * _Color;
+                return output;
             }
 
-            fixed4 frag(v2f i) : SV_Target
+            fixed4 frag(v2f input) : SV_Target
             {
-                fixed4 color = tex2D(_MainTex, i.texcoord) * i.color;
-                float edgeRight = 1.0 - i.texcoord.x;
-                float edgeY = min(i.texcoord.y, 1.0 - i.texcoord.y);
-                float fadeX = smoothstep(0.0, 1.0, saturate(edgeRight / max(_FadeX, 0.0001)));
-                float fadeY = smoothstep(0.0, 1.0, saturate(edgeY / max(_FadeY, 0.0001)));
-                float extensionArea = step(_ProtectedLeftRatio, i.texcoord.x);
-                color.a *= min(lerp(1.0, fadeX, extensionArea), lerp(1.0, fadeY, extensionArea));
+                fixed4 color = tex2D(_MainTex, input.texcoord) * input.color;
+                float isProtectedLeft = 1.0 - step(_ProtectedLeftRatio, input.texcoord.x);
+                float xEdge = min(input.texcoord.x, 1.0 - input.texcoord.x);
+                float yEdge = min(input.texcoord.y, 1.0 - input.texcoord.y);
+                float xFade = saturate(xEdge / max(_EdgeFadeX, 0.0001));
+                float yFade = saturate(yEdge / max(_EdgeFadeY, 0.0001));
+                float fade = smoothstep(0.0, 1.0, min(xFade, yFade));
+                color.a *= lerp(fade, 1.0, isProtectedLeft);
                 return color;
             }
             ENDCG

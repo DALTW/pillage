@@ -294,7 +294,7 @@ public static class GameProgress
         ActiveGlowingLeafTreeIndex = Mathf.Max(0, treeIndex);
     }
 
-    public static void MoveGlowingLeafToTree(int treeIndex)
+    public static void ReassignGlowingLeafQuestTarget(int treeIndex)
     {
         if (!HasStartedGlowingLeafQuest || HasCollectedGlowingLeaf)
         {

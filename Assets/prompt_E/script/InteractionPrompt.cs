@@ -14,6 +14,8 @@ public class InteractionPrompt : MonoBehaviour
     [SerializeField] private Vector3 promptShadowOffset = new Vector3(0.035f, -0.035f, 0f);
     [SerializeField] private int promptSortingOrder = 70;
 
+    private const string DefaultPromptText = "E";
+    private const string SkipPromptText = "E: \uC2A4\uD0B5";
     private const float CompletionGlowPulseSpeed = 4.8f;
 
     private GameObject simplePromptRoot;
@@ -21,8 +23,9 @@ public class InteractionPrompt : MonoBehaviour
     private TextMesh promptText;
     private TextMesh promptInnerGlowText;
     private TextMesh promptOuterGlowText;
-    private string currentPromptText = "E";
+    private SketchbookInteract sketchbookInteract;
     private bool usesCompletionGlow;
+    private string currentPromptText = DefaultPromptText;
 
     private void Start()
     {
@@ -30,15 +33,6 @@ public class InteractionPrompt : MonoBehaviour
         CreateSimplePrompt();
 
         SetPromptVisible(false);
-    }
-
-    public void SetPromptText(string value)
-    {
-        currentPromptText = string.IsNullOrEmpty(value) ? "E" : value;
-        UpdatePromptText(promptShadowText);
-        UpdatePromptText(promptText);
-        UpdatePromptText(promptInnerGlowText);
-        UpdatePromptText(promptOuterGlowText);
     }
 
     private void Update()
@@ -54,6 +48,7 @@ public class InteractionPrompt : MonoBehaviour
 
         float distance = Vector2.Distance(transform.position, player.position);
         bool shouldShowPrompt = distance <= showDistance;
+        UpdatePromptText();
         SetPromptVisible(shouldShowPrompt);
         UpdateCompletionGlow(shouldShowPrompt);
     }
@@ -106,7 +101,8 @@ public class InteractionPrompt : MonoBehaviour
         }
 
         HideLegacyPromptRenderers();
-        usesCompletionGlow = GetComponent<SketchbookInteract>() != null;
+        sketchbookInteract = GetComponent<SketchbookInteract>();
+        usesCompletionGlow = sketchbookInteract != null;
 
         simplePromptRoot = new GameObject("SimpleInteractionPromptE");
         simplePromptRoot.transform.SetParent(promptObject.transform, false);
@@ -176,11 +172,41 @@ public class InteractionPrompt : MonoBehaviour
         return textMesh;
     }
 
-    private void UpdatePromptText(TextMesh textMesh)
+    private void UpdatePromptText()
     {
-        if (textMesh != null)
+        string nextPromptText = sketchbookInteract != null && sketchbookInteract.IsDrawingSkipPromptActive
+            ? SkipPromptText
+            : DefaultPromptText;
+
+        if (currentPromptText == nextPromptText)
         {
-            textMesh.text = currentPromptText;
+            return;
+        }
+
+        currentPromptText = nextPromptText;
+        SetPromptText(currentPromptText);
+    }
+
+    private void SetPromptText(string value)
+    {
+        if (promptShadowText != null)
+        {
+            promptShadowText.text = value;
+        }
+
+        if (promptText != null)
+        {
+            promptText.text = value;
+        }
+
+        if (promptInnerGlowText != null)
+        {
+            promptInnerGlowText.text = value;
+        }
+
+        if (promptOuterGlowText != null)
+        {
+            promptOuterGlowText.text = value;
         }
     }
 

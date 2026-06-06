@@ -43,17 +43,13 @@ public class SketchOutsideTransition : MonoBehaviour
     private const float PathRevealDistance = 7.2f;
     private const float PathDecorationClearance = 1.15f;
     private const float ForestGateHalfHeight = 3.2f;
+    private const float OutsideMapEdgeFadeWorldWidth = 7.5f;
+    private const float OuterDecorativeTreeSpacing = 2.65f;
+    private const float OuterDecorativeTreeBandWidth = 7.6f;
+    private const string BackgroundEdgeFadeShaderResource = "OutsideMapEdgeFade";
     private const int ForestExtensionTreeCount = 64;
     private const int DeepForestExtensionTreeCount = 74;
     private const int FourthForestExtensionTreeCount = 118;
-    private const float OuterBoundaryTreeSpacing = 2.65f;
-    private const float OuterBoundaryTreeInnerOffset = 1.2f;
-    private const float OuterBoundaryTreeOuterOffset = 5.2f;
-    private const float OuterBoundaryTreeAreaPerTree = 14f;
-    private const int OuterBoundarySideLeft = 1;
-    private const int OuterBoundarySideRight = 2;
-    private const int OuterBoundarySideTop = 4;
-    private const int OuterBoundarySideBottom = 8;
     private const int DeepForestLeafPileCount = 10;
     private const int DeepForestMushroomLeafPileCount = 3;
     private const int ForestBranchTreePlacementIndex = 7;
@@ -89,16 +85,14 @@ public class SketchOutsideTransition : MonoBehaviour
     private const string QuestNpcCompletePrompt = "[\uD3B8\uC9C0]+[!]";
     private const string GrassResourcePath = "Outside/grass_thick";
     private const string MailboxResourcePath = "Outside/mailbox_thick";
-    private const string OutsideMapEdgeFadeShaderName = "Pillage/OutsideMapEdgeFade";
-    private const float OutsideMapEdgeFadeWorldWidth = 3.25f;
-    private static readonly int EdgeFadeXPropertyId = Shader.PropertyToID("_FadeX");
-    private static readonly int EdgeFadeYPropertyId = Shader.PropertyToID("_FadeY");
-    private static readonly int EdgeFadeProtectedLeftRatioPropertyId = Shader.PropertyToID("_ProtectedLeftRatio");
     private static readonly Color VillageGreenColor = new Color32(69, 158, 72, 255);
     private static readonly Color VillageGrassLightGreenColor = new Color32(151, 214, 83, 255);
     private static readonly Color BrownCrayonColor = new Color32(139, 82, 39, 232);
     private static readonly Color BlueCrayonColor = new Color32(47, 135, 218, 236);
     private static readonly Dictionary<Sprite, Sprite> GrassColorOverlaySpriteCache = new Dictionary<Sprite, Sprite>();
+    private static readonly int EdgeFadeXPropertyId = Shader.PropertyToID("_EdgeFadeX");
+    private static readonly int EdgeFadeYPropertyId = Shader.PropertyToID("_EdgeFadeY");
+    private static readonly int EdgeFadeProtectedLeftRatioPropertyId = Shader.PropertyToID("_ProtectedLeftRatio");
     private static readonly Vector2 GrassScaleRange = new Vector2(0.5508f, 0.8424f);
     private static readonly Vector2 TreeScaleRange = new Vector2(1.12f, 1.32f);
     private static readonly Vector3 OutsidePlayerOffset = Vector3.zero;
@@ -200,7 +194,6 @@ public class SketchOutsideTransition : MonoBehaviour
     private TextMesh questNpcPromptInnerGlowText;
     private TextMesh questNpcPromptOuterGlowText;
     private SpriteRenderer backgroundRenderer;
-    private Material backgroundEdgeFadeMaterial;
     private SketchWorldLineDrawing houseDrawing;
     private SketchWorldLineDrawing questNpcDrawing;
     private SketchWorldLineDrawing questNpcPondGuideDrawing;
@@ -217,6 +210,7 @@ public class SketchOutsideTransition : MonoBehaviour
     private Coroutine transitionRoutine;
     private Coroutine questNpcPondGuideRoutine;
     private Sprite whiteSprite;
+    private Material backgroundEdgeFadeMaterial;
     private bool hasCompletedOutsideMap;
     private bool isOutsideActive;
     private bool hasCreatedForestExtension;
@@ -372,6 +366,11 @@ public class SketchOutsideTransition : MonoBehaviour
         SketchOutsideTransition transition = GetOrCreateInstance();
         transition.EnsureSetup();
         yield return transition.PlayFourthForestRootBridgeRoutine();
+    }
+
+    public static Vector3 GetPreferredGlowingLeafTreeLocalPosition()
+    {
+        return FourthForestRegionOffset + new Vector3(-FourthForestSize.x * 0.28f, FourthForestSize.y * 0.28f, 0f);
     }
 
     public void EnterWoodhouse(GameObject player, Vector3 interiorEntryPosition)
@@ -858,6 +857,7 @@ public class SketchOutsideTransition : MonoBehaviour
         if (contentRoot != null)
         {
             EnsureForestExtensionCreated();
+            RemoveExtensionFenceLinework();
             EnsureDeepForestState();
             EnsureFourthForestState();
             EnsureVillageGreenColoringApplied();
@@ -874,6 +874,7 @@ public class SketchOutsideTransition : MonoBehaviour
         houseDoorInteract = CreateHouseDoor();
         CreateOutsideProps();
         EnsureForestExtensionCreated();
+        RemoveExtensionFenceLinework();
         EnsureDeepForestState();
         EnsureFourthForestState();
         EnsureVillageGreenColoringApplied();
@@ -911,6 +912,7 @@ public class SketchOutsideTransition : MonoBehaviour
     {
         DestroyGeneratedChildrenWithPrefix(propRoot != null ? propRoot.transform : null, "GeneratedDeepForest");
         DestroyGeneratedChildrenWithPrefix(propRoot != null ? propRoot.transform : null, "GeneratedGrassDeepForest");
+        DestroyGeneratedChildrenWithPrefix(propRoot != null ? propRoot.transform : null, "GeneratedOuterDecorativePine_DeepForest");
         DestroyGeneratedChildrenWithPrefix(boundaryRoot, "GeneratedDeepForest");
         DestroyGeneratedChildrenWithPrefix(boundaryRoot, "GeneratedForestDeepBoundary");
 
@@ -926,27 +928,7 @@ public class SketchOutsideTransition : MonoBehaviour
             deepForestRightBoundaryCollider.enabled = true;
         }
 
-        Transform forestFenceTransform = propRoot != null
-            ? propRoot.transform.Find("GeneratedForestExtensionFence")
-            : null;
-        SketchWorldLineDrawing forestFenceDrawing = forestFenceTransform != null
-            ? forestFenceTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (forestFenceDrawing != null)
-        {
-            forestFenceDrawing.SetStrokes(BuildForestExtensionBoundaryStrokes());
-        }
-
-        Transform forestFenceBrownTransform = propRoot != null
-            ? propRoot.transform.Find("GeneratedForestExtensionFence_BrownOverlay")
-            : null;
-        SketchWorldLineDrawing forestFenceBrownDrawing = forestFenceBrownTransform != null
-            ? forestFenceBrownTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (forestFenceBrownDrawing != null)
-        {
-            forestFenceBrownDrawing.SetStrokes(BuildForestExtensionBoundaryStrokes());
-        }
+        RemoveExtensionFenceLinework();
     }
 
     private void RemoveFourthForestExtension()
@@ -954,6 +936,7 @@ public class SketchOutsideTransition : MonoBehaviour
         GlowingLeafQuestRoute.ResetRoute();
         DestroyGeneratedChildrenWithPrefix(propRoot != null ? propRoot.transform : null, "GeneratedFourthForest");
         DestroyGeneratedChildrenWithPrefix(propRoot != null ? propRoot.transform : null, "GeneratedGrassFourthForest");
+        DestroyGeneratedChildrenWithPrefix(propRoot != null ? propRoot.transform : null, "GeneratedOuterDecorativePine_FourthForest");
         DestroyGeneratedChildrenWithPrefix(boundaryRoot, "GeneratedFourthForest");
 
         hasCreatedFourthForestExtension = false;
@@ -963,27 +946,7 @@ public class SketchOutsideTransition : MonoBehaviour
             deepForestRightBoundaryCollider.enabled = true;
         }
 
-        Transform forestFenceTransform = propRoot != null
-            ? propRoot.transform.Find("GeneratedForestExtensionFence")
-            : null;
-        SketchWorldLineDrawing forestFenceDrawing = forestFenceTransform != null
-            ? forestFenceTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (forestFenceDrawing != null)
-        {
-            forestFenceDrawing.SetStrokes(GameProgress.HasDrawnDeepForestSketch ? BuildForestExtensionBoundaryWithDeepGateStrokes() : BuildForestExtensionBoundaryStrokes());
-        }
-
-        Transform deepForestFenceTransform = propRoot != null
-            ? propRoot.transform.Find("GeneratedDeepForestExtensionFence")
-            : null;
-        SketchWorldLineDrawing deepForestFenceDrawing = deepForestFenceTransform != null
-            ? deepForestFenceTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (deepForestFenceDrawing != null)
-        {
-            deepForestFenceDrawing.SetStrokes(BuildDeepForestExtensionBoundaryStrokes());
-        }
+        RemoveExtensionFenceLinework();
     }
 
     private static void DestroyGeneratedChildrenWithPrefix(Transform parent, string namePrefix)
@@ -1035,6 +998,17 @@ public class SketchOutsideTransition : MonoBehaviour
         }
     }
 
+    private void RemoveExtensionFenceLinework()
+    {
+        Transform parent = propRoot != null ? propRoot.transform : null;
+        DestroyGeneratedChild(parent, "GeneratedForestExtensionFence");
+        DestroyGeneratedChild(parent, "GeneratedForestExtensionFence_BrownOverlay");
+        DestroyGeneratedChild(parent, "GeneratedDeepForestExtensionFence");
+        DestroyGeneratedChild(parent, "GeneratedDeepForestExtensionFence_BrownOverlay");
+        DestroyGeneratedChild(parent, "GeneratedFourthForestExtensionFence");
+        DestroyGeneratedChild(parent, "GeneratedFourthForestExtensionFence_BrownOverlay");
+    }
+
     private SpriteRenderer CreateBackground()
     {
         GameObject backgroundObject = new GameObject("GeneratedWhiteOutsideBackground");
@@ -1051,25 +1025,26 @@ public class SketchOutsideTransition : MonoBehaviour
 
     private void ApplyBackgroundEdgeFadeMaterial(SpriteRenderer spriteRenderer)
     {
-        Shader fadeShader = Resources.Load<Shader>("OutsideMapEdgeFade");
-        if (fadeShader == null)
-        {
-            fadeShader = Shader.Find(OutsideMapEdgeFadeShaderName);
-        }
-
-        if (spriteRenderer == null || fadeShader == null)
+        if (spriteRenderer == null)
         {
             return;
         }
 
-        if (backgroundEdgeFadeMaterial == null)
+        Shader shader = Resources.Load<Shader>(BackgroundEdgeFadeShaderResource);
+        if (shader == null)
         {
-            backgroundEdgeFadeMaterial = new Material(fadeShader)
-            {
-                name = "GeneratedOutsideMapEdgeFadeMaterial"
-            };
+            shader = Shader.Find("Sprites/Default");
         }
 
+        if (shader == null)
+        {
+            return;
+        }
+
+        backgroundEdgeFadeMaterial = new Material(shader)
+        {
+            name = "GeneratedOutsideMapEdgeFadeMaterial"
+        };
         spriteRenderer.sharedMaterial = backgroundEdgeFadeMaterial;
         UpdateBackgroundEdgeFade();
     }
@@ -1219,23 +1194,7 @@ public class SketchOutsideTransition : MonoBehaviour
             forestRightBoundaryCollider.enabled = false;
         }
 
-        Transform forestFenceTransform = propRoot.transform.Find("GeneratedForestExtensionFence");
-        SketchWorldLineDrawing forestFenceDrawing = forestFenceTransform != null
-            ? forestFenceTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (forestFenceDrawing != null)
-        {
-            forestFenceDrawing.SetStrokes(BuildForestExtensionBoundaryWithDeepGateStrokes());
-        }
-
-        Transform forestFenceBrownTransform = propRoot.transform.Find("GeneratedForestExtensionFence_BrownOverlay");
-        SketchWorldLineDrawing forestFenceBrownDrawing = forestFenceBrownTransform != null
-            ? forestFenceBrownTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (forestFenceBrownDrawing != null)
-        {
-            forestFenceBrownDrawing.SetStrokes(BuildForestExtensionBoundaryWithDeepGateStrokes());
-        }
+        RemoveExtensionFenceLinework();
 
         CreateDeepForestExtensionBoundary();
         CreateDeepForestExtensionPath();
@@ -1274,41 +1233,7 @@ public class SketchOutsideTransition : MonoBehaviour
 
         DestroyGeneratedChildrenWithPrefix(boundaryRoot, "GeneratedDeepForestExtensionBoundary_Right");
 
-        Transform forestFenceTransform = propRoot.transform.Find("GeneratedForestExtensionFence");
-        SketchWorldLineDrawing forestFenceDrawing = forestFenceTransform != null
-            ? forestFenceTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (forestFenceDrawing != null)
-        {
-            forestFenceDrawing.SetStrokes(BuildForestExtensionBoundaryWithFourthForestStrokes());
-        }
-
-        Transform deepForestFenceTransform = propRoot.transform.Find("GeneratedDeepForestExtensionFence");
-        SketchWorldLineDrawing deepForestFenceDrawing = deepForestFenceTransform != null
-            ? deepForestFenceTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (deepForestFenceDrawing != null)
-        {
-            deepForestFenceDrawing.SetStrokes(BuildDeepForestExtensionBoundaryWithFourthGateStrokes());
-        }
-
-        Transform forestFenceBrownTransform = propRoot.transform.Find("GeneratedForestExtensionFence_BrownOverlay");
-        SketchWorldLineDrawing forestFenceBrownDrawing = forestFenceBrownTransform != null
-            ? forestFenceBrownTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (forestFenceBrownDrawing != null)
-        {
-            forestFenceBrownDrawing.SetStrokes(BuildForestExtensionBoundaryWithFourthForestStrokes());
-        }
-
-        Transform deepForestFenceBrownTransform = propRoot.transform.Find("GeneratedDeepForestExtensionFence_BrownOverlay");
-        SketchWorldLineDrawing deepForestFenceBrownDrawing = deepForestFenceBrownTransform != null
-            ? deepForestFenceBrownTransform.GetComponent<SketchWorldLineDrawing>()
-            : null;
-        if (deepForestFenceBrownDrawing != null)
-        {
-            deepForestFenceBrownDrawing.SetStrokes(BuildDeepForestExtensionBoundaryWithFourthGateStrokes());
-        }
+        RemoveExtensionFenceLinework();
 
         CreateFourthForestExtensionBoundary();
         CreateFourthForestExtensionPath();
@@ -1746,12 +1671,7 @@ public class SketchOutsideTransition : MonoBehaviour
             placedTreeCount++;
         }
 
-        CreateOuterBoundaryTreesForRegion(
-            "GeneratedForestOuterBoundaryPine",
-            ForestRegionOffset,
-            BackgroundSize,
-            OuterBoundarySideTop | OuterBoundarySideBottom,
-            DecorationRandomSeed + 223);
+        CreateOuterDecorativePines("GeneratedOuterDecorativePine_Forest", ForestRegionOffset, BackgroundSize, DecorationRandomSeed + 311);
     }
 
     private void CreateDeepForestExtensionDecorations()
@@ -1808,12 +1728,7 @@ public class SketchOutsideTransition : MonoBehaviour
             usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
         }
 
-        CreateOuterBoundaryTreesForRegion(
-            "GeneratedDeepForestOuterBoundaryPine",
-            DeepForestRegionOffset,
-            DeepForestSize,
-            OuterBoundarySideTop | OuterBoundarySideBottom,
-            DecorationRandomSeed + 239);
+        CreateOuterDecorativePines("GeneratedOuterDecorativePine_DeepForest", DeepForestRegionOffset, DeepForestSize, DecorationRandomSeed + 347);
     }
 
     private static HashSet<int> PickDeepForestMushroomLeafPileIndices(int excludedIndex)
@@ -1847,17 +1762,12 @@ public class SketchOutsideTransition : MonoBehaviour
             new Color32(104, 70, 34, 255));
         leafPileDrawing.Configure(HouseLineWidth * 0.78f, new Color32(104, 70, 34, 255), DeepForestLeafPileSortingOrder);
 
-        DeepForestLeafPileInteract leafPileInteract = leafPileDrawing.gameObject.AddComponent<DeepForestLeafPileInteract>();
-        leafPileInteract.Configure(hasReward, hasMushroom, DeepForestLeafPilePromptDistance, DeepForestLeafPilePromptSortingOrder);
-        leafPileInteract.enabled = false;
-
         LeafPileCrayonColorTarget colorTarget = leafPileDrawing.gameObject.AddComponent<LeafPileCrayonColorTarget>();
         colorTarget.Configure(scale);
 
-        if (GameProgress.HasColoredBrownDetails)
-        {
-            CreateLeafPileBrownOverlay(colorTarget, leafPileDrawing);
-        }
+        DeepForestLeafPileInteract leafPileInteract = leafPileDrawing.gameObject.AddComponent<DeepForestLeafPileInteract>();
+        leafPileInteract.Configure(hasReward, hasMushroom, DeepForestLeafPilePromptDistance, DeepForestLeafPilePromptSortingOrder);
+        leafPileInteract.enabled = false;
 
         RegisterLineReveal(leafPileDrawing, leafPileInteract, leafPilePosition);
     }
@@ -1910,14 +1820,63 @@ public class SketchOutsideTransition : MonoBehaviour
             usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
         }
 
-        GlowingLeafQuestRoute.ReassignActiveLeafToPreferredTree();
+        GlowingLeafQuestRoute.ReassignActiveQuestToPreferredTarget();
+        CreateOuterDecorativePines("GeneratedOuterDecorativePine_FourthForest", FourthForestRegionOffset, FourthForestSize, DecorationRandomSeed + 389);
+    }
 
-        CreateOuterBoundaryTreesForRegion(
-            "GeneratedFourthForestOuterBoundaryPine",
-            FourthForestRegionOffset,
-            FourthForestSize,
-            OuterBoundarySideTop | OuterBoundarySideBottom | OuterBoundarySideRight,
-            DecorationRandomSeed + 251);
+    private void CreateOuterDecorativePines(string objectPrefix, Vector3 regionCenter, Vector2 regionSize, int randomSeed)
+    {
+        if (propRoot == null)
+        {
+            return;
+        }
+
+        System.Random random = new System.Random(randomSeed);
+        List<DecorationFootprint> usedFootprints = new List<DecorationFootprint>();
+        float perimeter = (regionSize.x + regionSize.y) * 2f;
+        int targetCount = Mathf.Max(10, Mathf.RoundToInt(perimeter / OuterDecorativeTreeSpacing * 0.38f));
+
+        for (int i = 0; i < targetCount; i++)
+        {
+            float scale = RandomRange(random, TreeScaleRange.x * 0.82f, TreeScaleRange.y * 1.02f);
+            Vector2 halfSize = GetPineDecorationHalfSize(scale);
+
+            if (!TryPickOuterDecorativeTreePosition(random, usedFootprints, regionCenter, regionSize, halfSize, out Vector2 position))
+            {
+                continue;
+            }
+
+            Vector3 localPosition = new Vector3(position.x, position.y, 0f);
+            CreateDecorativePineTree($"{objectPrefix}_{i:00}", localPosition, scale, TreeSortingOrder - 1, propRoot.transform);
+            usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
+        }
+    }
+
+    private SketchWorldLineDrawing CreateDecorativePineTree(string objectName, Vector3 localPosition, float scale, int sortingOrder, Transform parent)
+    {
+        SketchWorldLineDrawing pineTree = CreateLineDrawing(
+            objectName,
+            localPosition,
+            BuildPineTreeStrokes(scale),
+            sortingOrder,
+            parent);
+        TreeCrayonColorTarget colorTarget = pineTree.gameObject.AddComponent<TreeCrayonColorTarget>();
+        colorTarget.Configure(scale);
+
+        RegisterLineReveal(pineTree, localPosition);
+        CreatePropGroundStroke(objectName, localPosition, 1.16f * scale, sortingOrder - 1, parent);
+
+        if (GameProgress.HasColoredVillageGreen)
+        {
+            CreateTreeLeafOverlay(colorTarget, pineTree, sortingOrder + 2);
+        }
+
+        if (GameProgress.HasColoredBrownDetails)
+        {
+            CreateTreeTrunkOverlay(colorTarget, pineTree, sortingOrder + 3);
+        }
+
+        return pineTree;
     }
 
     private void CreateFourthForestBigTree()
@@ -2183,6 +2142,90 @@ public class SketchOutsideTransition : MonoBehaviour
             || (GameProgress.HasColoredWaterBlue && IsInsideFourthForestRiverIslandTreeClearZone(position, 1.2f));
     }
 
+    private static bool TryPickOuterDecorativeTreePosition(
+        System.Random random,
+        List<DecorationFootprint> usedFootprints,
+        Vector3 regionCenter,
+        Vector2 regionSize,
+        Vector2 halfSize,
+        out Vector2 position)
+    {
+        float minimumSpacingSqr = OuterDecorativeTreeSpacing * OuterDecorativeTreeSpacing;
+        float halfWidth = regionSize.x * 0.5f;
+        float halfHeight = regionSize.y * 0.5f;
+        float left = regionCenter.x - halfWidth;
+        float right = regionCenter.x + halfWidth;
+        float bottom = regionCenter.y - halfHeight;
+        float top = regionCenter.y + halfHeight;
+
+        for (int attempt = 0; attempt < DecorationPickAttempts; attempt++)
+        {
+            float bandOffset = RandomRange(random, 1.0f, OuterDecorativeTreeBandWidth);
+            switch (random.Next(4))
+            {
+                case 0:
+                    position = new Vector2(left - bandOffset, RandomRange(random, bottom - OuterDecorativeTreeBandWidth, top + OuterDecorativeTreeBandWidth));
+                    break;
+                case 1:
+                    position = new Vector2(right + bandOffset, RandomRange(random, bottom - OuterDecorativeTreeBandWidth, top + OuterDecorativeTreeBandWidth));
+                    break;
+                case 2:
+                    position = new Vector2(RandomRange(random, left - OuterDecorativeTreeBandWidth, right + OuterDecorativeTreeBandWidth), top + bandOffset);
+                    break;
+                default:
+                    position = new Vector2(RandomRange(random, left - OuterDecorativeTreeBandWidth, right + OuterDecorativeTreeBandWidth), bottom - bandOffset);
+                    break;
+            }
+
+            DecorationFootprint candidate = BuildDecorationFootprint(position, halfSize);
+            if (DoesFootprintOverlapPlayableRegion(candidate) || DoesFootprintOverlapAnyOutsideMapPath(candidate))
+            {
+                continue;
+            }
+
+            bool hasEnoughSpace = true;
+            for (int i = 0; i < usedFootprints.Count; i++)
+            {
+                if (DoFootprintsOverlap(candidate, usedFootprints[i])
+                    || (usedFootprints[i].GroundPosition - position).sqrMagnitude < minimumSpacingSqr)
+                {
+                    hasEnoughSpace = false;
+                    break;
+                }
+            }
+
+            if (hasEnoughSpace)
+            {
+                return true;
+            }
+        }
+
+        position = Vector2.zero;
+        return false;
+    }
+
+    private static bool DoesFootprintOverlapPlayableRegion(DecorationFootprint footprint)
+    {
+        return DoesFootprintOverlapBox(footprint, Vector3.zero, BackgroundSize * 0.5f)
+            || DoesFootprintOverlapBox(footprint, ForestRegionOffset, BackgroundSize * 0.5f)
+            || DoesFootprintOverlapBox(footprint, DeepForestRegionOffset, DeepForestSize * 0.5f)
+            || DoesFootprintOverlapBox(footprint, FourthForestRegionOffset, FourthForestSize * 0.5f);
+    }
+
+    private static bool DoesFootprintOverlapBox(DecorationFootprint footprint, Vector3 center, Vector2 halfExtents)
+    {
+        return Mathf.Abs(footprint.Center.x - center.x) < footprint.HalfSize.x + halfExtents.x
+            && Mathf.Abs(footprint.Center.y - center.y) < footprint.HalfSize.y + halfExtents.y;
+    }
+
+    private static bool DoesFootprintOverlapAnyOutsideMapPath(DecorationFootprint footprint)
+    {
+        return DoesFootprintOverlapOutsidePath(footprint)
+            || DoesFootprintOverlapForestPath(footprint)
+            || DoesFootprintOverlapDeepForestPath(footprint)
+            || DoesFootprintOverlapFourthForestPath(footprint);
+    }
+
     private static bool IsInsideFourthForestRiverIslandTreeClearZone(Vector2 position, float treeScale)
     {
         float margin = 0.72f + Mathf.Max(0f, treeScale) * 0.92f;
@@ -2444,7 +2487,6 @@ public class SketchOutsideTransition : MonoBehaviour
         ApplyHouseBrownColoring();
         ApplyPathBrownColoring();
         ApplyFenceBrownColoring();
-        RemoveRemovedMapFenceBrownOverlays();
         ApplyTreeTrunkBrownColoring();
         ApplyPineconeBrownColoring();
         ApplyLeafPileBrownColoring();
@@ -2607,13 +2649,7 @@ public class SketchOutsideTransition : MonoBehaviour
             : BuildFenceRightStrokes();
         CreateFenceBrownOverlay("GeneratedOutsideFence_Right", "GeneratedOutsideFenceBrown_Right", Vector3.zero, rightFenceStrokes, BuildVerticalFenceRevealPoints(halfWidth, halfHeight));
 
-    }
-
-    private void RemoveRemovedMapFenceBrownOverlays()
-    {
-        DestroyGeneratedChild(propRoot.transform, "GeneratedForestExtensionFence_BrownOverlay");
-        DestroyGeneratedChild(propRoot.transform, "GeneratedDeepForestExtensionFence_BrownOverlay");
-        DestroyGeneratedChild(propRoot.transform, "GeneratedFourthForestExtensionFence_BrownOverlay");
+        RemoveExtensionFenceLinework();
     }
 
     private void CreateFenceBrownOverlay(string sourceObjectName, string overlayObjectName, Vector3 localPosition, List<Vector3[]> strokes, Vector3[] revealPositions)
@@ -2653,22 +2689,27 @@ public class SketchOutsideTransition : MonoBehaviour
 
     private void ApplyPineconeBrownColoring()
     {
-        PineTreeShakeInteract[] trees = propRoot.GetComponentsInChildren<PineTreeShakeInteract>(true);
+        PineTreeShakeInteract[] pineTrees = propRoot.GetComponentsInChildren<PineTreeShakeInteract>(true);
 
-        for (int i = 0; i < trees.Length; i++)
+        for (int i = 0; i < pineTrees.Length; i++)
         {
-            PineTreeShakeInteract tree = trees[i];
-            if (tree == null || !tree.HasAttachedPinecone)
+            PineTreeShakeInteract pineTree = pineTrees[i];
+            if (pineTree == null || !pineTree.HasAttachedPinecone)
             {
                 continue;
             }
 
-            tree.ApplyAttachedPineconeBrownColor(TreeSortingOrder + 4);
+            pineTree.ApplyBrownCrayonColoring(TreeSortingOrder + 5);
         }
     }
 
     private void ApplyLeafPileBrownColoring()
     {
+        if (!GameProgress.HasDrawnDeepForestSketch)
+        {
+            return;
+        }
+
         LeafPileCrayonColorTarget[] leafPiles = propRoot.GetComponentsInChildren<LeafPileCrayonColorTarget>(true);
 
         for (int i = 0; i < leafPiles.Length; i++)
@@ -2681,25 +2722,6 @@ public class SketchOutsideTransition : MonoBehaviour
 
             CreateLeafPileBrownOverlay(leafPile, leafPile.GetComponent<SketchWorldLineDrawing>());
         }
-    }
-
-    private void CreateLeafPileBrownOverlay(LeafPileCrayonColorTarget colorTarget, SketchWorldLineDrawing sourceDrawing)
-    {
-        if (colorTarget == null || colorTarget.transform.Find("GeneratedBrownLeafPileOverlay") != null)
-        {
-            return;
-        }
-
-        CreateBrownLineOverlay(
-            "GeneratedBrownLeafPileOverlay",
-            Vector3.zero,
-            BuildLeafPileStrokes(colorTarget.LeafPileScale),
-            DeepForestLeafPileSortingOrder + 3,
-            colorTarget.transform,
-            sourceDrawing,
-            0.86f,
-            MapRevealDistance,
-            colorTarget.transform.localPosition);
     }
 
     private void CreateTreeTrunkOverlay(TreeCrayonColorTarget colorTarget, SketchWorldLineDrawing sourceDrawing, int sortingOrder)
@@ -2723,6 +2745,30 @@ public class SketchOutsideTransition : MonoBehaviour
         else
         {
             RegisterLineReveal(trunkOverlay, colorTarget.transform.localPosition);
+        }
+    }
+
+    private void CreateLeafPileBrownOverlay(LeafPileCrayonColorTarget colorTarget, SketchWorldLineDrawing sourceDrawing)
+    {
+        if (colorTarget == null || colorTarget.transform.Find("GeneratedBrownLeafPileOverlay") != null)
+        {
+            return;
+        }
+
+        GameObject overlayObject = new GameObject("GeneratedBrownLeafPileOverlay");
+        overlayObject.transform.SetParent(colorTarget.transform, false);
+
+        SketchWorldLineDrawing leafPileOverlay = overlayObject.AddComponent<SketchWorldLineDrawing>();
+        leafPileOverlay.Configure(HouseLineWidth * 1.45f, BrownCrayonColor, DeepForestLeafPileSortingOrder + 3);
+        leafPileOverlay.SetStrokes(BuildLeafPileBrownColorStrokes(colorTarget.LeafPileScale));
+
+        if (sourceDrawing != null && sourceDrawing.RevealProgress >= 0.95f)
+        {
+            leafPileOverlay.RevealProgress = 1f;
+        }
+        else
+        {
+            RegisterLineReveal(leafPileOverlay, colorTarget.transform.localPosition);
         }
     }
 
@@ -3724,12 +3770,6 @@ public class SketchOutsideTransition : MonoBehaviour
         CreateQuestNpcLetterGrass(usedFootprints);
         SpawnRandomPineTrees("GeneratedPineTree", TreeSpawnCount, 6.2f, TreeScaleRange.x, TreeScaleRange.y, TreeSortingOrder, random, usedFootprints, -31f, 31f, DecorationMin.y, 12.5f);
         SpawnRandomSpriteProps("GeneratedGrass", GrassResourcePath, GrassSpawnCount, 2.1f, GrassScaleRange.x, GrassScaleRange.y, GrassSortingOrder, random, usedFootprints, DecorationMin.x, DecorationMax.x, DecorationMin.y, DecorationMax.y);
-        CreateOuterBoundaryTreesForRegion(
-            "GeneratedVillageOuterBoundaryPine",
-            Vector3.zero,
-            BackgroundSize,
-            OuterBoundarySideLeft | OuterBoundarySideTop | OuterBoundarySideBottom,
-            DecorationRandomSeed + 211);
     }
 
     private void CreateQuestNpcLetterGrass(List<DecorationFootprint> usedFootprints)
@@ -3768,194 +3808,6 @@ public class SketchOutsideTransition : MonoBehaviour
 
         Vector2 halfSize = GetDecorationHalfSize(sprite, localScale);
         usedFootprints.Add(BuildDecorationFootprint(new Vector2(localPosition.x, localPosition.y), halfSize));
-    }
-
-    private void CreateOuterBoundaryTreesForRegion(string objectPrefix, Vector3 regionCenter, Vector2 regionSize, int sides, int randomSeed)
-    {
-        if (propRoot == null || string.IsNullOrEmpty(objectPrefix))
-        {
-            return;
-        }
-
-        System.Random random = new System.Random(randomSeed);
-        List<DecorationFootprint> usedFootprints = new List<DecorationFootprint>();
-        int createdCount = 0;
-        float halfWidth = regionSize.x * 0.5f;
-        float halfHeight = regionSize.y * 0.5f;
-        float left = regionCenter.x - halfWidth;
-        float right = regionCenter.x + halfWidth;
-        float bottom = regionCenter.y - halfHeight;
-        float top = regionCenter.y + halfHeight;
-
-        if ((sides & OuterBoundarySideTop) != 0)
-        {
-            SpawnOuterBoundaryTreeStrip(
-                objectPrefix,
-                "Top",
-                random,
-                usedFootprints,
-                ref createdCount,
-                left + 1.2f,
-                right - 1.2f,
-                top + OuterBoundaryTreeInnerOffset,
-                top + OuterBoundaryTreeOuterOffset);
-        }
-
-        if ((sides & OuterBoundarySideBottom) != 0)
-        {
-            SpawnOuterBoundaryTreeStrip(
-                objectPrefix,
-                "Bottom",
-                random,
-                usedFootprints,
-                ref createdCount,
-                left + 1.2f,
-                right - 1.2f,
-                bottom - OuterBoundaryTreeOuterOffset,
-                bottom - OuterBoundaryTreeInnerOffset);
-        }
-
-        if ((sides & OuterBoundarySideLeft) != 0)
-        {
-            SpawnOuterBoundaryTreeStrip(
-                objectPrefix,
-                "Left",
-                random,
-                usedFootprints,
-                ref createdCount,
-                left - OuterBoundaryTreeOuterOffset,
-                left - OuterBoundaryTreeInnerOffset,
-                bottom + 2.0f,
-                top - 2.0f);
-        }
-
-        if ((sides & OuterBoundarySideRight) != 0)
-        {
-            SpawnOuterBoundaryTreeStrip(
-                objectPrefix,
-                "Right",
-                random,
-                usedFootprints,
-                ref createdCount,
-                right + OuterBoundaryTreeInnerOffset,
-                right + OuterBoundaryTreeOuterOffset,
-                bottom + 2.0f,
-                top - 2.0f);
-        }
-    }
-
-    private void SpawnOuterBoundaryTreeStrip(
-        string objectPrefix,
-        string sideName,
-        System.Random random,
-        List<DecorationFootprint> usedFootprints,
-        ref int createdCount,
-        float minX,
-        float maxX,
-        float minY,
-        float maxY)
-    {
-        if (maxX <= minX || maxY <= minY)
-        {
-            return;
-        }
-
-        float area = (maxX - minX) * (maxY - minY);
-        int targetCount = Mathf.Clamp(Mathf.RoundToInt(area / OuterBoundaryTreeAreaPerTree), 4, 72);
-
-        for (int i = 0; i < targetCount; i++)
-        {
-            float scale = RandomRange(random, TreeScaleRange.x * 0.86f, TreeScaleRange.y * 0.98f);
-            Vector2 halfSize = GetPineDecorationHalfSize(scale);
-
-            if (!TryPickOuterBoundaryTreePosition(
-                    random,
-                    usedFootprints,
-                    halfSize,
-                    OuterBoundaryTreeSpacing,
-                    minX,
-                    maxX,
-                    minY,
-                    maxY,
-                    out Vector2 position))
-            {
-                continue;
-            }
-
-            CreateOuterBoundaryTree(
-                $"{objectPrefix}_{sideName}_{createdCount:00}",
-                new Vector3(position.x, position.y, 0f),
-                scale);
-            usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
-            createdCount++;
-        }
-    }
-
-    private bool TryPickOuterBoundaryTreePosition(
-        System.Random random,
-        List<DecorationFootprint> usedFootprints,
-        Vector2 halfSize,
-        float minimumSpacing,
-        float minX,
-        float maxX,
-        float minY,
-        float maxY,
-        out Vector2 position)
-    {
-        float minimumSpacingSqr = minimumSpacing * minimumSpacing;
-
-        for (int attempt = 0; attempt < DecorationPickAttempts; attempt++)
-        {
-            position = new Vector2(
-                RandomRange(random, minX, maxX),
-                RandomRange(random, minY, maxY));
-
-            DecorationFootprint candidate = BuildDecorationFootprint(position, halfSize);
-            bool hasEnoughSpace = true;
-
-            for (int i = 0; i < usedFootprints.Count; i++)
-            {
-                if (DoFootprintsOverlap(candidate, usedFootprints[i])
-                    || (usedFootprints[i].GroundPosition - position).sqrMagnitude < minimumSpacingSqr)
-                {
-                    hasEnoughSpace = false;
-                    break;
-                }
-            }
-
-            if (hasEnoughSpace)
-            {
-                return true;
-            }
-        }
-
-        position = Vector2.zero;
-        return false;
-    }
-
-    private void CreateOuterBoundaryTree(string objectName, Vector3 localPosition, float scale)
-    {
-        SketchWorldLineDrawing pineTree = CreateLineDrawing(
-            objectName,
-            localPosition,
-            BuildPineTreeStrokes(scale),
-            TreeSortingOrder,
-            propRoot.transform);
-        TreeCrayonColorTarget colorTarget = pineTree.gameObject.AddComponent<TreeCrayonColorTarget>();
-        colorTarget.Configure(scale);
-
-        RegisterLineReveal(pineTree, localPosition);
-        CreatePropGroundStroke(objectName, localPosition, 1.16f * scale, TreeSortingOrder - 1, propRoot.transform);
-
-        if (GameProgress.HasColoredVillageGreen)
-        {
-            CreateTreeLeafOverlay(colorTarget, pineTree, TreeSortingOrder + 2);
-        }
-
-        if (GameProgress.HasColoredBrownDetails)
-        {
-            CreateTreeTrunkOverlay(colorTarget, pineTree, TreeSortingOrder + 3);
-        }
     }
 
     private void SpawnRandomPineTrees(
@@ -4845,29 +4697,31 @@ public class SketchOutsideTransition : MonoBehaviour
         float riverY = FourthForestRiverOffset.y;
 
         strokes.Add(Points(
-            riverX - 6.72f, riverY + 0.72f,
-            riverX - 5.84f, riverY + 0.98f,
-            riverX - 4.76f, riverY + 0.62f,
-            riverX - 3.64f, riverY + 0.86f,
-            riverX - 3.16f, riverY + 0.58f));
+            riverX - 7.12f, riverY + 0.84f,
+            riverX - 6.12f, riverY + 1.08f,
+            riverX - 5.04f, riverY + 0.72f,
+            riverX - 3.82f, riverY + 0.94f,
+            riverX - 2.54f, riverY + 0.62f,
+            riverX - 1.72f, riverY + 0.72f));
         strokes.Add(Points(
-            riverX - 6.62f, riverY - 0.82f,
-            riverX - 5.7f, riverY - 0.54f,
-            riverX - 4.66f, riverY - 0.9f,
-            riverX - 3.58f, riverY - 0.6f,
-            riverX - 3.06f, riverY - 0.72f));
+            riverX - 7.08f, riverY - 0.68f,
+            riverX - 6.04f, riverY - 0.42f,
+            riverX - 4.92f, riverY - 0.78f,
+            riverX - 3.7f, riverY - 0.52f,
+            riverX - 2.46f, riverY - 0.72f,
+            riverX - 1.68f, riverY - 0.58f));
         strokes.Add(Points(
-            riverX - 6.18f, riverY + 0.46f,
-            riverX - 6.08f, riverY - 0.66f));
+            riverX - 6.6f, riverY + 0.5f,
+            riverX - 6.46f, riverY - 0.42f));
         strokes.Add(Points(
-            riverX - 5.18f, riverY + 0.62f,
-            riverX - 5.08f, riverY - 0.72f));
+            riverX - 5.24f, riverY + 0.42f,
+            riverX - 5.14f, riverY - 0.56f));
         strokes.Add(Points(
-            riverX - 4.18f, riverY + 0.48f,
-            riverX - 4.08f, riverY - 0.66f));
+            riverX - 3.88f, riverY + 0.54f,
+            riverX - 3.78f, riverY - 0.46f));
         strokes.Add(Points(
-            riverX - 3.42f, riverY + 0.48f,
-            riverX - 3.34f, riverY - 0.58f));
+            riverX - 2.42f, riverY + 0.4f,
+            riverX - 2.34f, riverY - 0.48f));
 
         return strokes;
     }
@@ -5034,6 +4888,18 @@ public class SketchOutsideTransition : MonoBehaviour
         strokes.Add(ScaledPoints(scale, 0.22f, 0.12f, 0.46f, 0.42f, 0.68f, 0.16f, 0.9f, 0.34f));
         strokes.Add(ScaledPoints(scale, -0.9f, -0.28f, -0.44f, -0.4f, 0.04f, -0.3f, 0.5f, -0.42f, 0.94f, -0.28f));
         strokes.Add(ScaledPoints(scale, -0.34f, -0.04f, -0.22f, 0.14f, -0.02f, 0.02f, 0.08f, 0.2f, 0.26f, 0.04f));
+
+        return strokes;
+    }
+
+    private static List<Vector3[]> BuildLeafPileBrownColorStrokes(float scale)
+    {
+        List<Vector3[]> strokes = BuildLeafPileStrokes(scale);
+
+        strokes.Add(ScaledPoints(scale, -0.72f, 0.02f, -0.38f, 0.12f, -0.04f, 0.04f, 0.28f, 0.14f, 0.68f, -0.02f));
+        strokes.Add(ScaledPoints(scale, -0.64f, -0.18f, -0.28f, -0.08f, 0.08f, -0.2f, 0.42f, -0.1f, 0.78f, -0.22f));
+        strokes.Add(ScaledPoints(scale, -0.36f, 0.28f, -0.12f, 0.36f, 0.16f, 0.24f, 0.46f, 0.34f));
+        strokes.Add(ScaledPoints(scale, -0.46f, -0.34f, -0.06f, -0.28f, 0.34f, -0.36f));
 
         return strokes;
     }
@@ -8108,7 +7974,7 @@ public class FourthForestBigTreePrompt : MonoBehaviour, IInteractable
             return;
         }
 
-        if (!CanStartGlowingLeafQuest())
+        if (GameProgress.HasCollectedGlowingLeaf || GameProgress.HasStartedGlowingLeafQuest)
         {
             return;
         }
@@ -8142,14 +8008,14 @@ public class FourthForestBigTreePrompt : MonoBehaviour, IInteractable
         bool isRevealed = lineDrawing == null || lineDrawing.RevealProgress >= 0.95f;
         bool isNear = player != null && Vector2.Distance(transform.position, player.position) <= showDistance;
 
-        bool canStartLeafQuest = CanStartGlowingLeafQuest();
+        bool canStartLeafQuest = !GameProgress.HasCollectedGlowingLeaf && !GameProgress.HasStartedGlowingLeafQuest;
         bool canGrantBlueCrayon = CanGrantBlueCrayon();
         bool canGrowRootBridge = CanGrowRootBridge();
-        bool hasPromptAction = canStartLeafQuest || canGrantBlueCrayon || canGrowRootBridge;
+        bool canInteract = isRevealed && !isStartingQuest && (canStartLeafQuest || canGrantBlueCrayon || canGrowRootBridge);
 
-        SetPromptText(canGrantBlueCrayon ? CompletePrompt : canGrowRootBridge ? RootBridgePrompt : SearchingPrompt);
-        SetInteractionAvailable(isRevealed && hasPromptAction);
-        SetPromptVisible(isRevealed && hasPromptAction && isNear && !isStartingQuest);
+        SetPromptText(canGrowRootBridge ? RootBridgePrompt : canGrantBlueCrayon ? CompletePrompt : SearchingPrompt);
+        SetInteractionAvailable(canInteract);
+        SetPromptVisible(canInteract && isNear);
         UpdatePromptGlow();
     }
 
@@ -8244,8 +8110,7 @@ public class FourthForestBigTreePrompt : MonoBehaviour, IInteractable
         GameProgress.CollectBlueCrayon();
         PencilFragmentHud.ShowCollected();
         isStartingQuest = false;
-        SetPromptVisible(false);
-        SetInteractionAvailable(CanGrowRootBridge());
+        SetInteractionAvailable(false);
     }
 
     private IEnumerator GrowRootBridgeRoutine()
@@ -8283,13 +8148,6 @@ public class FourthForestBigTreePrompt : MonoBehaviour, IInteractable
         return GameProgress.HasCollectedGlowingLeaf
             && !GameProgress.HasCollectedBlueCrayon
             && !GameProgress.HasUsedBlueCrayon;
-    }
-
-    private static bool CanStartGlowingLeafQuest()
-    {
-        return !GameProgress.HasCollectedGlowingLeaf
-            && !GameProgress.HasStartedGlowingLeafQuest
-            && GlowingLeafQuestRoute.HasAvailableTree();
     }
 
     private static bool CanGrowRootBridge()
@@ -8545,7 +8403,7 @@ public class FourthForestGlowingLeafTreeInteract : MonoBehaviour, IInteractable
 
     public void Interact(GameObject interactor)
     {
-        if (!CanCollectGlowingLeaf() || !isActiveAndEnabled || isCollecting || interactor == null)
+        if (!CanCollectGlowingLeaf() || !IsTreeRevealed() || !isActiveAndEnabled || isCollecting || interactor == null)
         {
             return;
         }
@@ -8569,7 +8427,7 @@ public class FourthForestGlowingLeafTreeInteract : MonoBehaviour, IInteractable
     private void OnEnable()
     {
         FindPlayer();
-        SetInteractionAvailable(CanCollectGlowingLeaf());
+        SetInteractionAvailable(CanCollectGlowingLeaf() && IsTreeRevealed());
 
         if (promptObject != null)
         {
@@ -8579,17 +8437,12 @@ public class FourthForestGlowingLeafTreeInteract : MonoBehaviour, IInteractable
 
     private void Update()
     {
-        bool isRevealed = lineDrawing == null || lineDrawing.RevealProgress >= 0.95f;
+        bool isRevealed = IsTreeRevealed();
         bool canCollect = CanCollectGlowingLeaf() && isRevealed && !isCollecting;
         SetInteractionAvailable(canCollect);
 
         if (!canCollect)
         {
-            if (promptObject != null)
-            {
-                promptObject.SetActive(false);
-            }
-
             return;
         }
 
@@ -8722,7 +8575,15 @@ public class FourthForestGlowingLeafTreeInteract : MonoBehaviour, IInteractable
 
     private bool CanCollectGlowingLeaf()
     {
-        return treeIndex >= 0 && GameProgress.IsGlowingLeafWaitingOnTree(treeIndex);
+        return treeIndex >= 0
+            && !GameProgress.HasCollectedBlueCrayon
+            && !GameProgress.HasUsedBlueCrayon
+            && GameProgress.IsGlowingLeafWaitingOnTree(treeIndex);
+    }
+
+    private bool IsTreeRevealed()
+    {
+        return lineDrawing != null && lineDrawing.RevealProgress >= 0.95f;
     }
 
     private void FindPlayer()
@@ -8767,9 +8628,6 @@ public static class GlowingLeafQuestRoute
     private const int GlowingLeafSortingOrder = 84;
     private const float FlightDuration = 2.15f;
     private const float CollectDuration = 0.62f;
-    private const float PreferredTreeHorizontalRatio = 0.36f;
-    private const float PreferredTreeY = 8.5f;
-    private const float PreferredTreeYWeight = 1.18f;
 
     private static readonly List<RouteTree> routeTrees = new List<RouteTree>();
     private static Sprite glowSprite;
@@ -8793,7 +8651,7 @@ public static class GlowingLeafQuestRoute
         RouteTree routeTree = new RouteTree(localPosition, parent, treeDrawing, Mathf.Max(0.1f, treeScale));
         routeTrees.Add(routeTree);
 
-        if (GameProgress.IsGlowingLeafWaitingOnTree(index) && IsGeneratedTree(index))
+        if (GameProgress.IsGlowingLeafWaitingOnTree(index))
         {
             EnsureTreeGlow(index);
         }
@@ -8801,32 +8659,20 @@ public static class GlowingLeafQuestRoute
         return index;
     }
 
-    public static bool HasAvailableTree()
+    public static void ReassignActiveQuestToPreferredTarget()
     {
-        for (int i = 0; i < routeTrees.Count; i++)
-        {
-            if (IsGeneratedTree(i))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        ReassignActiveQuestToPreferredTargetIfNeeded();
+        UpdateActiveLeafVisibility();
     }
 
     public static IEnumerator PlayLeafFromBigTree(Vector3 startWorldPosition, Transform fallbackParent)
     {
-        if (!HasAvailableTree() || GameProgress.HasStartedGlowingLeafQuest || GameProgress.HasCollectedGlowingLeaf)
+        if (routeTrees.Count <= 0 || GameProgress.HasStartedGlowingLeafQuest || GameProgress.HasCollectedGlowingLeaf)
         {
             yield break;
         }
 
         int targetIndex = PickTargetTreeIndex();
-        if (targetIndex < 0)
-        {
-            yield break;
-        }
-
         GameProgress.StartGlowingLeafQuest(targetIndex);
         yield return AnimateLeafToTreeRoutine(startWorldPosition, targetIndex, fallbackParent);
         EnsureTreeGlow(targetIndex);
@@ -8834,9 +8680,8 @@ public static class GlowingLeafQuestRoute
 
     public static IEnumerator CollectLeafFromTree(int treeIndex, Transform treeTransform, Transform playerTransform)
     {
-        if (!GameProgress.IsGlowingLeafWaitingOnTree(treeIndex) || !IsGeneratedTree(treeIndex))
+        if (!GameProgress.IsGlowingLeafWaitingOnTree(treeIndex))
         {
-            RemoveTreeGlow(treeIndex);
             yield break;
         }
 
@@ -8884,9 +8729,11 @@ public static class GlowingLeafQuestRoute
 
     public static void UpdateActiveLeafVisibility()
     {
+        ReassignActiveQuestToPreferredTargetIfNeeded();
+
         for (int i = 0; i < routeTrees.Count; i++)
         {
-            if (GameProgress.IsGlowingLeafWaitingOnTree(i) && IsGeneratedTree(i))
+            if (GameProgress.IsGlowingLeafWaitingOnTree(i))
             {
                 EnsureTreeGlow(i);
             }
@@ -8897,37 +8744,26 @@ public static class GlowingLeafQuestRoute
         }
     }
 
-    public static void ReassignActiveLeafToPreferredTree()
+    private static void ReassignActiveQuestToPreferredTargetIfNeeded()
     {
-        if (!GameProgress.HasStartedGlowingLeafQuest || GameProgress.HasCollectedGlowingLeaf)
+        if (routeTrees.Count <= 0 || !GameProgress.HasStartedGlowingLeafQuest || GameProgress.HasCollectedGlowingLeaf)
         {
             return;
         }
 
         int targetIndex = PickTargetTreeIndex();
-        if (targetIndex < 0)
+        int currentIndex = GameProgress.ActiveGlowingLeafTreeIndex;
+        if (currentIndex == targetIndex)
         {
-            UpdateActiveLeafVisibility();
             return;
         }
 
-        int currentIndex = GameProgress.ActiveGlowingLeafTreeIndex;
-        if (currentIndex != targetIndex)
-        {
-            RemoveTreeGlow(currentIndex);
-            GameProgress.MoveGlowingLeafToTree(targetIndex);
-        }
-
-        UpdateActiveLeafVisibility();
+        RemoveTreeGlow(currentIndex);
+        GameProgress.ReassignGlowingLeafQuestTarget(targetIndex);
     }
 
     private static IEnumerator AnimateLeafToTreeRoutine(Vector3 startWorldPosition, int targetTreeIndex, Transform fallbackParent)
     {
-        if (!IsGeneratedTree(targetTreeIndex))
-        {
-            yield break;
-        }
-
         RouteTree targetTree = GetRouteTree(targetTreeIndex);
         Transform parent = targetTree.Parent != null ? targetTree.Parent : fallbackParent;
         Vector3 targetPosition = GetTreeLeafWorldPosition(targetTreeIndex);
@@ -8970,52 +8806,18 @@ public static class GlowingLeafQuestRoute
 
     private static int PickTargetTreeIndex()
     {
-        int targetIndex = -1;
-        float bestScore = float.MinValue;
-        float minX = float.MaxValue;
-        float maxX = float.MinValue;
-        float minY = float.MaxValue;
-        float maxY = float.MinValue;
-        int generatedTreeCount = 0;
+        int targetIndex = 0;
+        float bestDistanceSqr = float.MaxValue;
+        Vector3 preferredPosition = SketchOutsideTransition.GetPreferredGlowingLeafTreeLocalPosition();
 
         for (int i = 0; i < routeTrees.Count; i++)
         {
-            if (!IsGeneratedTree(i))
-            {
-                continue;
-            }
-
             Vector3 position = routeTrees[i].LocalPosition;
-            minX = Mathf.Min(minX, position.x);
-            maxX = Mathf.Max(maxX, position.x);
-            minY = Mathf.Min(minY, position.y);
-            maxY = Mathf.Max(maxY, position.y);
-            generatedTreeCount++;
-        }
+            float distanceSqr = (position - preferredPosition).sqrMagnitude;
 
-        if (generatedTreeCount <= 0)
-        {
-            return -1;
-        }
-
-        float preferredX = Mathf.Lerp(minX, maxX, PreferredTreeHorizontalRatio);
-        float preferredY = Mathf.Clamp(PreferredTreeY, minY, maxY);
-
-        for (int i = 0; i < routeTrees.Count; i++)
-        {
-            if (!IsGeneratedTree(i))
+            if (distanceSqr < bestDistanceSqr)
             {
-                continue;
-            }
-
-            Vector3 position = routeTrees[i].LocalPosition;
-            float deltaX = position.x - preferredX;
-            float deltaY = (position.y - preferredY) * PreferredTreeYWeight;
-            float score = -(deltaX * deltaX + deltaY * deltaY);
-
-            if (score > bestScore)
-            {
-                bestScore = score;
+                bestDistanceSqr = distanceSqr;
                 targetIndex = i;
             }
         }
@@ -9048,12 +8850,18 @@ public static class GlowingLeafQuestRoute
 
     private static void EnsureTreeGlow(int index)
     {
-        if (!IsGeneratedTree(index))
+        if (index < 0 || index >= routeTrees.Count)
         {
             return;
         }
 
         RouteTree routeTree = routeTrees[index];
+        if (!IsTreeReadyForLeaf(routeTree))
+        {
+            RemoveTreeGlow(index);
+            return;
+        }
+
         if (routeTree.GlowObject != null)
         {
             return;
@@ -9101,21 +8909,11 @@ public static class GlowingLeafQuestRoute
         }
     }
 
-    private static bool IsGeneratedTree(int index)
+    private static bool IsTreeReadyForLeaf(RouteTree routeTree)
     {
-        if (index < 0 || index >= routeTrees.Count)
-        {
-            return false;
-        }
-
-        RouteTree routeTree = routeTrees[index];
-        if (routeTree.TreeTransform == null || !routeTree.TreeTransform.gameObject.activeInHierarchy)
-        {
-            return false;
-        }
-
-        SketchWorldLineDrawing treeDrawing = routeTree.TreeTransform.GetComponent<SketchWorldLineDrawing>();
-        return treeDrawing == null || treeDrawing.RevealProgress >= 0.95f;
+        return routeTree.TreeTransform != null
+            && routeTree.TreeDrawing != null
+            && routeTree.TreeDrawing.RevealProgress >= 0.95f;
     }
 
     private static GameObject CreateGlowingLeafObject(string objectName, Transform parent, Vector3 worldPosition, float scale)
@@ -9204,6 +9002,7 @@ public static class GlowingLeafQuestRoute
         public readonly Vector3 LocalPosition;
         public readonly Transform Parent;
         public readonly Transform TreeTransform;
+        public readonly SketchWorldLineDrawing TreeDrawing;
         public readonly float TreeScale;
         public GameObject GlowObject;
 
@@ -9212,6 +9011,7 @@ public static class GlowingLeafQuestRoute
             LocalPosition = localPosition;
             Parent = parent;
             TreeTransform = treeDrawing != null ? treeDrawing.transform : null;
+            TreeDrawing = treeDrawing;
             TreeScale = treeScale;
             GlowObject = null;
         }

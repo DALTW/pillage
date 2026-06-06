@@ -1,32 +1,27 @@
-using System;
 using System.Collections;
 using UnityEngine;
 
 public class SketchbookInteract : MonoBehaviour, IInteractable
 {
-    private const string DefaultPromptText = "E";
-    private const string SkipPromptText = "E: 스킵";
-
     [SerializeField] private GameObject bigSketchbookUI;
     [SerializeField] private SketchbookDrawingAnimation sketchbookDrawingAnimation;
     [SerializeField] private float openScaleDuration = 0.2f;
 
     private bool isOpen;
     private bool isFirstDrawingLocked;
-    private bool isDrawing;
-    private bool canSkipDrawing;
-    private bool hasDrawingCompleted;
     private bool lockedPlayerMoveWasEnabled;
     private Coroutine scaleRoutine;
-    private InteractionPrompt interactionPrompt;
     private PlayerMove2D lockedPlayerMove;
     private Rigidbody2D lockedPlayerRigidbody;
     private Vector3 openScale = Vector3.one;
 
+    public bool IsDrawingSkipPromptActive => isOpen
+        && isFirstDrawingLocked
+        && sketchbookDrawingAnimation != null
+        && sketchbookDrawingAnimation.IsPlaying;
+
     private void Start()
     {
-        interactionPrompt = GetComponent<InteractionPrompt>();
-
         if (bigSketchbookUI == null)
         {
             Debug.LogWarning("Big Sketchbook UI is not assigned.", this);
@@ -49,9 +44,14 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
 
     private void Update()
     {
-        if (isOpen && isDrawing && canSkipDrawing && Input.GetKeyDown(KeyCode.E))
+        if (isOpen
+            && isFirstDrawingLocked
+            && sketchbookDrawingAnimation != null
+            && sketchbookDrawingAnimation.IsPlaying
+            && Input.GetKeyDown(KeyCode.E))
         {
-            SkipDrawingAnimation();
+            sketchbookDrawingAnimation.SkipToComplete();
+            return;
         }
 
         if (isOpen && !isFirstDrawingLocked && Input.GetKeyDown(KeyCode.Escape))
@@ -64,12 +64,6 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
     {
         if (isOpen)
         {
-            if (isDrawing && canSkipDrawing)
-            {
-                SkipDrawingAnimation();
-                return;
-            }
-
             if (isFirstDrawingLocked)
             {
                 return;
@@ -100,7 +94,6 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         bool shouldPlayBlueColoring = !shouldPlayDrawingAnimation && !shouldPlayForestExpansion && !shouldPlayDeepForestExpansion && !shouldPlayFourthForestExpansion && !shouldPlayGreenColoring && !shouldPlayBrownColoring && GameProgress.CanColorWaterBlueAtSketchbook;
         GameProgress.CheckSketchbook();
         isOpen = true;
-        ResetDrawingSkipState();
         isFirstDrawingLocked = shouldPlayDrawingAnimation || shouldPlayForestExpansion || shouldPlayDeepForestExpansion || shouldPlayFourthForestExpansion || shouldPlayGreenColoring || shouldPlayBrownColoring || shouldPlayBlueColoring;
         LockPlayerForFirstDrawing(interactor);
         bigSketchbookUI.SetActive(true);
@@ -138,7 +131,6 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         }
 
         isOpen = false;
-        ResetDrawingSkipState();
         UnlockPlayerAfterFirstDrawing();
 
         if (scaleRoutine != null)
@@ -160,23 +152,23 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
 
         if (isOpen && shouldPlayDrawingAnimation && sketchbookDrawingAnimation != null)
         {
-            StartDrawingAnimation(() => sketchbookDrawingAnimation.Play(CompleteFirstDrawing));
+            sketchbookDrawingAnimation.Play(CompleteFirstDrawing);
         }
         else if (isOpen && shouldPlayForestExpansion && sketchbookDrawingAnimation != null)
         {
-            StartDrawingAnimation(() => sketchbookDrawingAnimation.PlayForestExpansion(CompleteForestExpansionDrawing));
+            sketchbookDrawingAnimation.PlayForestExpansion(CompleteForestExpansionDrawing);
         }
         else if (isOpen && shouldPlayDeepForestExpansion && sketchbookDrawingAnimation != null)
         {
-            StartDrawingAnimation(() => sketchbookDrawingAnimation.PlayDeepForestExpansion(CompleteDeepForestExpansionDrawing));
+            sketchbookDrawingAnimation.PlayDeepForestExpansion(CompleteDeepForestExpansionDrawing);
         }
         else if (isOpen && shouldPlayFourthForestExpansion && sketchbookDrawingAnimation != null)
         {
-            StartDrawingAnimation(() => sketchbookDrawingAnimation.PlayFourthForestExpansion(CompleteFourthForestExpansionDrawing));
+            sketchbookDrawingAnimation.PlayFourthForestExpansion(CompleteFourthForestExpansionDrawing);
         }
         else if (isOpen && shouldPlayGreenColoring && sketchbookDrawingAnimation != null)
         {
-            StartDrawingAnimation(() => sketchbookDrawingAnimation.PlayVillageGreenColoring(CompleteVillageGreenColoring));
+            sketchbookDrawingAnimation.PlayVillageGreenColoring(CompleteVillageGreenColoring);
         }
         else if (isOpen && shouldPlayGreenColoring)
         {
@@ -184,7 +176,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         }
         else if (isOpen && shouldPlayBrownColoring && sketchbookDrawingAnimation != null)
         {
-            StartDrawingAnimation(() => sketchbookDrawingAnimation.PlayBrownColoring(CompleteBrownColoring));
+            sketchbookDrawingAnimation.PlayBrownColoring(CompleteBrownColoring);
         }
         else if (isOpen && shouldPlayBrownColoring)
         {
@@ -192,7 +184,7 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         }
         else if (isOpen && shouldPlayBlueColoring && sketchbookDrawingAnimation != null)
         {
-            StartDrawingAnimation(() => sketchbookDrawingAnimation.PlayBlueWaterColoring(CompleteBlueWaterColoring));
+            sketchbookDrawingAnimation.PlayBlueWaterColoring(CompleteBlueWaterColoring);
         }
         else if (isOpen && shouldPlayBlueColoring)
         {
@@ -225,79 +217,6 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
         }
 
         bigSketchbookUI.transform.localScale = end;
-    }
-
-    private void StartDrawingAnimation(Action playAnimation)
-    {
-        isDrawing = true;
-        canSkipDrawing = true;
-        hasDrawingCompleted = false;
-        SetInteractionPromptText(SkipPromptText);
-
-        playAnimation?.Invoke();
-
-        if (sketchbookDrawingAnimation == null || !sketchbookDrawingAnimation.IsPlaying)
-        {
-            isDrawing = false;
-            canSkipDrawing = false;
-            SetInteractionPromptText(DefaultPromptText);
-        }
-    }
-
-    private void SkipDrawingAnimation()
-    {
-        if (!isDrawing || !canSkipDrawing || hasDrawingCompleted)
-        {
-            return;
-        }
-
-        if (sketchbookDrawingAnimation == null || !sketchbookDrawingAnimation.IsPlaying)
-        {
-            ResetDrawingSkipState();
-            return;
-        }
-
-        canSkipDrawing = false;
-
-        if (!sketchbookDrawingAnimation.SkipToEnd())
-        {
-            ResetDrawingSkipState();
-        }
-    }
-
-    private void CompleteDrawingOnce(Action completionLogic)
-    {
-        if (hasDrawingCompleted)
-        {
-            return;
-        }
-
-        hasDrawingCompleted = true;
-        isDrawing = false;
-        canSkipDrawing = false;
-        SetInteractionPromptText(DefaultPromptText);
-        completionLogic?.Invoke();
-    }
-
-    private void ResetDrawingSkipState()
-    {
-        isDrawing = false;
-        canSkipDrawing = false;
-        hasDrawingCompleted = false;
-        SetInteractionPromptText(DefaultPromptText);
-    }
-
-    private void SetInteractionPromptText(string text)
-    {
-        if (interactionPrompt == null)
-        {
-            interactionPrompt = GetComponent<InteractionPrompt>();
-        }
-
-        if (interactionPrompt != null)
-        {
-            interactionPrompt.SetPromptText(text);
-        }
     }
 
     private void LockPlayerForFirstDrawing(GameObject interactor)
@@ -338,120 +257,98 @@ public class SketchbookInteract : MonoBehaviour, IInteractable
 
     private void CompleteFirstDrawing()
     {
-        CompleteDrawingOnce(() =>
-        {
-            GameProgress.PlaySketchbookDrawing();
-            UnlockPlayerAfterFirstDrawing();
-        });
+        GameProgress.PlaySketchbookDrawing();
+        UnlockPlayerAfterFirstDrawing();
     }
 
     private void CompleteForestExpansionDrawing()
     {
-        CompleteDrawingOnce(() =>
-        {
-            GameProgress.CompleteSketchbookForestDrawing();
-            PencilFragmentHud.RefreshCollected();
-            SketchOutsideTransition.ApplySketchbookForestUnlock();
-            UnlockPlayerAfterFirstDrawing();
-        });
+        GameProgress.CompleteSketchbookForestDrawing();
+        PencilFragmentHud.RefreshCollected();
+        SketchOutsideTransition.ApplySketchbookForestUnlock();
+        UnlockPlayerAfterFirstDrawing();
     }
 
     private void CompleteDeepForestExpansionDrawing()
     {
-        CompleteDrawingOnce(() =>
+        GameProgress.CompleteSketchbookDeepForestDrawing();
+        SketchOutsideTransition.ApplySketchbookDeepForestUnlock();
+
+        if (GameProgress.HasCollectedGreenCrayon)
         {
-            GameProgress.CompleteSketchbookDeepForestDrawing();
-            SketchOutsideTransition.ApplySketchbookDeepForestUnlock();
+            GameProgress.ColorVillageGreen();
+            SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
+        }
 
-            if (GameProgress.HasCollectedGreenCrayon)
-            {
-                GameProgress.ColorVillageGreen();
-                SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
-            }
+        if (GameProgress.HasCollectedBrownCrayon)
+        {
+            GameProgress.ColorBrownDetails();
+            SketchOutsideTransition.ApplySketchbookBrownColoring();
+        }
 
-            if (GameProgress.HasCollectedBrownCrayon)
-            {
-                GameProgress.ColorBrownDetails();
-                SketchOutsideTransition.ApplySketchbookBrownColoring();
-            }
+        if (GameProgress.HasCollectedBlueCrayon)
+        {
+            GameProgress.ColorWaterBlue();
+            SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
+        }
 
-            if (GameProgress.HasCollectedBlueCrayon)
-            {
-                GameProgress.ColorWaterBlue();
-                SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
-            }
-
-            PencilFragmentHud.RefreshCollected();
-            UnlockPlayerAfterFirstDrawing();
-        });
+        PencilFragmentHud.RefreshCollected();
+        UnlockPlayerAfterFirstDrawing();
     }
 
     private void CompleteFourthForestExpansionDrawing()
     {
-        CompleteDrawingOnce(() =>
+        GameProgress.CompleteSketchbookFourthForestDrawing();
+        SketchOutsideTransition.ApplySketchbookFourthForestUnlock();
+
+        if (GameProgress.HasCollectedGreenCrayon)
         {
-            GameProgress.CompleteSketchbookFourthForestDrawing();
-            SketchOutsideTransition.ApplySketchbookFourthForestUnlock();
+            GameProgress.ColorVillageGreen();
+            SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
+        }
 
-            if (GameProgress.HasCollectedGreenCrayon)
-            {
-                GameProgress.ColorVillageGreen();
-                SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
-            }
+        if (GameProgress.HasCollectedBrownCrayon)
+        {
+            GameProgress.ColorBrownDetails();
+            SketchOutsideTransition.ApplySketchbookBrownColoring();
+        }
 
-            if (GameProgress.HasCollectedBrownCrayon)
-            {
-                GameProgress.ColorBrownDetails();
-                SketchOutsideTransition.ApplySketchbookBrownColoring();
-            }
+        if (GameProgress.HasCollectedBlueCrayon)
+        {
+            GameProgress.ColorWaterBlue();
+            SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
+        }
 
-            if (GameProgress.HasCollectedBlueCrayon)
-            {
-                GameProgress.ColorWaterBlue();
-                SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
-            }
-
-            PencilFragmentHud.RefreshCollected();
-            UnlockPlayerAfterFirstDrawing();
-        });
+        PencilFragmentHud.RefreshCollected();
+        UnlockPlayerAfterFirstDrawing();
     }
 
     private void CompleteVillageGreenColoring()
     {
-        CompleteDrawingOnce(() =>
-        {
-            GameProgress.ColorVillageGreen();
-            PencilFragmentHud.RefreshCollected();
-            SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
-            UnlockPlayerAfterFirstDrawing();
-        });
+        GameProgress.ColorVillageGreen();
+        PencilFragmentHud.RefreshCollected();
+        SketchOutsideTransition.ApplySketchbookVillageGreenColoring();
+        UnlockPlayerAfterFirstDrawing();
     }
 
     private void CompleteBrownColoring()
     {
-        CompleteDrawingOnce(() =>
-        {
-            GameProgress.ColorBrownDetails();
-            PencilFragmentHud.RefreshCollected();
-            SketchOutsideTransition.ApplySketchbookBrownColoring();
-            UnlockPlayerAfterFirstDrawing();
-        });
+        GameProgress.ColorBrownDetails();
+        PencilFragmentHud.RefreshCollected();
+        SketchOutsideTransition.ApplySketchbookBrownColoring();
+        UnlockPlayerAfterFirstDrawing();
     }
 
     private void CompleteBlueWaterColoring()
     {
-        CompleteDrawingOnce(() =>
-        {
-            GameProgress.ColorWaterBlue();
-            PencilFragmentHud.RefreshCollected();
-            SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
-            UnlockPlayerAfterFirstDrawing();
-        });
+        GameProgress.ColorWaterBlue();
+        PencilFragmentHud.RefreshCollected();
+        SketchOutsideTransition.ApplySketchbookBlueWaterColoring();
+        UnlockPlayerAfterFirstDrawing();
     }
 
     private void OnDisable()
     {
-        ResetDrawingSkipState();
         UnlockPlayerAfterFirstDrawing();
     }
 

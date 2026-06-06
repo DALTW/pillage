@@ -578,9 +578,9 @@ public class LetterQuestHud : MonoBehaviour
     private static Sprite fragmentSprite;
     private static Sprite completedLetterSprite;
     private static Sprite waterBottleSprite;
+    private static Sprite branchSprite;
     private static Sprite acornSprite;
     private static Sprite mushroomSprite;
-    private static Sprite forestBranchSprite;
     private static Sprite glowingLeafSprite;
 
     private const float IconStartX = 18f;
@@ -591,9 +591,9 @@ public class LetterQuestHud : MonoBehaviour
 
     private readonly List<GameObject> iconObjects = new List<GameObject>();
     private GameObject waterBottleIconObject;
+    private GameObject branchIconObject;
     private GameObject acornIconObject;
     private GameObject mushroomIconObject;
-    private GameObject forestBranchIconObject;
     private GameObject glowingLeafIconObject;
 
     public static void ShowProgress()
@@ -640,18 +640,18 @@ public class LetterQuestHud : MonoBehaviour
     {
         int collectedCount = GameProgress.AvailableLetterFragmentCount;
         bool hasWaterBottleIcon = GameProgress.HasCollectedWellWaterBottle;
+        bool hasBranchIcon = GameProgress.HasCollectedForestBranch;
         bool hasAcornIcon = GameProgress.HasCollectedAcorn;
         bool hasMushroomIcon = GameProgress.HasCollectedMushroom;
-        bool hasForestBranchIcon = GameProgress.HasCollectedForestBranch;
         bool hasGlowingLeafIcon = GameProgress.HasCollectedGlowingLeaf;
         bool shouldReserveDeliveredLetterSlot = GameProgress.HasDeliveredCompletedLetter;
         HideChildrenWithPrefix("GeneratedLetterQuestHudIcon_");
 
         if (collectedCount <= 0
             && !hasWaterBottleIcon
+            && !hasBranchIcon
             && !hasAcornIcon
             && !hasMushroomIcon
-            && !hasForestBranchIcon
             && !hasGlowingLeafIcon)
         {
             for (int i = 0; i < iconObjects.Count; i++)
@@ -667,6 +667,11 @@ public class LetterQuestHud : MonoBehaviour
                 waterBottleIconObject.SetActive(false);
             }
 
+            if (branchIconObject != null)
+            {
+                branchIconObject.SetActive(false);
+            }
+
             if (acornIconObject != null)
             {
                 acornIconObject.SetActive(false);
@@ -675,11 +680,6 @@ public class LetterQuestHud : MonoBehaviour
             if (mushroomIconObject != null)
             {
                 mushroomIconObject.SetActive(false);
-            }
-
-            if (forestBranchIconObject != null)
-            {
-                forestBranchIconObject.SetActive(false);
             }
 
             if (glowingLeafIconObject != null)
@@ -746,32 +746,32 @@ public class LetterQuestHud : MonoBehaviour
             }
         }
 
-        float nextCollectibleX = GetCollectibleIconX(hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount, 0);
-        RefreshWaterBottleIcon(hasWaterBottleIcon, nextCollectibleX);
+        int collectibleIndex = 0;
+        RefreshWaterBottleIcon(hasWaterBottleIcon, GetCollectibleIconX(hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount, collectibleIndex));
         if (hasWaterBottleIcon)
         {
-            nextCollectibleX += CollectibleIconSpacing;
+            collectibleIndex++;
         }
 
-        RefreshAcornIcon(hasAcornIcon, nextCollectibleX);
+        RefreshBranchIcon(hasBranchIcon, GetCollectibleIconX(hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount, collectibleIndex));
+        if (hasBranchIcon)
+        {
+            collectibleIndex++;
+        }
+
+        RefreshAcornIcon(hasAcornIcon, GetCollectibleIconX(hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount, collectibleIndex));
         if (hasAcornIcon)
         {
-            nextCollectibleX += CollectibleIconSpacing;
+            collectibleIndex++;
         }
 
-        RefreshMushroomIcon(hasMushroomIcon, nextCollectibleX);
+        RefreshMushroomIcon(hasMushroomIcon, GetCollectibleIconX(hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount, collectibleIndex));
         if (hasMushroomIcon)
         {
-            nextCollectibleX += CollectibleIconSpacing;
+            collectibleIndex++;
         }
 
-        RefreshForestBranchIcon(hasForestBranchIcon, nextCollectibleX);
-        if (hasForestBranchIcon)
-        {
-            nextCollectibleX += CollectibleIconSpacing;
-        }
-
-        RefreshGlowingLeafIcon(hasGlowingLeafIcon, nextCollectibleX);
+        RefreshGlowingLeafIcon(hasGlowingLeafIcon, GetCollectibleIconX(hasCompletedLetter, shouldReserveDeliveredLetterSlot, visibleCount, collectibleIndex));
     }
 
     private GameObject CreateIconObject(int index)
@@ -854,6 +854,60 @@ public class LetterQuestHud : MonoBehaviour
 
         Image image = iconObject.AddComponent<Image>();
         image.sprite = GetWaterBottleSprite();
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+
+        return iconObject;
+    }
+
+    private void RefreshBranchIcon(bool shouldShow, float x)
+    {
+        if (!shouldShow)
+        {
+            if (branchIconObject != null)
+            {
+                branchIconObject.SetActive(false);
+            }
+
+            return;
+        }
+
+        if (branchIconObject == null)
+        {
+            branchIconObject = CreateBranchIconObject();
+        }
+
+        branchIconObject.SetActive(true);
+
+        Image image = branchIconObject.GetComponent<Image>();
+        if (image != null)
+        {
+            image.sprite = GetBranchSprite();
+            image.color = Color.white;
+        }
+
+        RectTransform rectTransform = branchIconObject.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.anchoredPosition = new Vector2(x, IconY + 8f);
+            rectTransform.sizeDelta = new Vector2(38f, 34f);
+        }
+    }
+
+    private GameObject CreateBranchIconObject()
+    {
+        GameObject iconObject = new GameObject("GeneratedLetterQuestHudBranchIcon");
+        iconObject.transform.SetParent(transform, false);
+
+        RectTransform rectTransform = iconObject.AddComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(0f, 1f);
+        rectTransform.pivot = new Vector2(0f, 1f);
+        rectTransform.anchoredPosition = new Vector2(IconStartX + CollectibleIconSpacing, IconY + 8f);
+        rectTransform.sizeDelta = new Vector2(38f, 34f);
+
+        Image image = iconObject.AddComponent<Image>();
+        image.sprite = GetBranchSprite();
         image.preserveAspect = true;
         image.raycastTarget = false;
 
@@ -968,60 +1022,6 @@ public class LetterQuestHud : MonoBehaviour
         return iconObject;
     }
 
-    private void RefreshForestBranchIcon(bool shouldShow, float x)
-    {
-        if (!shouldShow)
-        {
-            if (forestBranchIconObject != null)
-            {
-                forestBranchIconObject.SetActive(false);
-            }
-
-            return;
-        }
-
-        if (forestBranchIconObject == null)
-        {
-            forestBranchIconObject = CreateForestBranchIconObject();
-        }
-
-        forestBranchIconObject.SetActive(true);
-
-        Image image = forestBranchIconObject.GetComponent<Image>();
-        if (image != null)
-        {
-            image.sprite = GetForestBranchSprite();
-            image.color = Color.white;
-        }
-
-        RectTransform rectTransform = forestBranchIconObject.GetComponent<RectTransform>();
-        if (rectTransform != null)
-        {
-            rectTransform.anchoredPosition = new Vector2(x, IconY + 8f);
-            rectTransform.sizeDelta = new Vector2(38f, 34f);
-        }
-    }
-
-    private GameObject CreateForestBranchIconObject()
-    {
-        GameObject iconObject = new GameObject("GeneratedLetterQuestHudForestBranchIcon");
-        iconObject.transform.SetParent(transform, false);
-
-        RectTransform rectTransform = iconObject.AddComponent<RectTransform>();
-        rectTransform.anchorMin = new Vector2(0f, 1f);
-        rectTransform.anchorMax = new Vector2(0f, 1f);
-        rectTransform.pivot = new Vector2(0f, 1f);
-        rectTransform.anchoredPosition = new Vector2(IconStartX + CollectibleIconSpacing * 3f, IconY + 8f);
-        rectTransform.sizeDelta = new Vector2(38f, 34f);
-
-        Image image = iconObject.AddComponent<Image>();
-        image.sprite = GetForestBranchSprite();
-        image.preserveAspect = true;
-        image.raycastTarget = false;
-
-        return iconObject;
-    }
-
     private void RefreshGlowingLeafIcon(bool shouldShow, float x)
     {
         if (!shouldShow)
@@ -1052,7 +1052,7 @@ public class LetterQuestHud : MonoBehaviour
         if (rectTransform != null)
         {
             rectTransform.anchoredPosition = new Vector2(x, IconY + 7f);
-            rectTransform.sizeDelta = new Vector2(34f, 36f);
+            rectTransform.sizeDelta = new Vector2(36f, 36f);
         }
     }
 
@@ -1066,7 +1066,7 @@ public class LetterQuestHud : MonoBehaviour
         rectTransform.anchorMax = new Vector2(0f, 1f);
         rectTransform.pivot = new Vector2(0f, 1f);
         rectTransform.anchoredPosition = new Vector2(IconStartX + CollectibleIconSpacing * 4f, IconY + 7f);
-        rectTransform.sizeDelta = new Vector2(34f, 36f);
+        rectTransform.sizeDelta = new Vector2(36f, 36f);
 
         Image image = iconObject.AddComponent<Image>();
         image.sprite = GetGlowingLeafSprite();
@@ -1234,6 +1234,39 @@ public class LetterQuestHud : MonoBehaviour
         return waterBottleSprite;
     }
 
+    private static Sprite GetBranchSprite()
+    {
+        if (branchSprite != null)
+        {
+            return branchSprite;
+        }
+
+        const int width = 48;
+        const int height = 44;
+        Texture2D texture = CreateClearTexture(width, height);
+        Color outline = new Color32(58, 38, 22, 255);
+        Color bark = new Color32(139, 82, 39, 255);
+        Color barkLight = new Color32(184, 116, 56, 255);
+
+        FillRect(texture, 9, 28, 30, 5, outline);
+        FillRect(texture, 11, 29, 26, 3, bark);
+        FillRect(texture, 14, 24, 20, 5, outline);
+        FillRect(texture, 16, 25, 16, 3, bark);
+        FillRect(texture, 20, 20, 13, 5, outline);
+        FillRect(texture, 22, 21, 9, 3, bark);
+        FillRect(texture, 28, 15, 10, 5, outline);
+        FillRect(texture, 30, 16, 6, 3, bark);
+        FillRect(texture, 25, 18, 4, 5, outline);
+        FillRect(texture, 26, 19, 2, 3, barkLight);
+        FillRect(texture, 13, 29, 5, 2, barkLight);
+        FillRect(texture, 24, 25, 5, 2, barkLight);
+
+        texture.Apply();
+        branchSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+        branchSprite.name = "GeneratedBranchHudSprite";
+        return branchSprite;
+    }
+
     private static Sprite GetAcornSprite()
     {
         if (acornSprite != null)
@@ -1308,44 +1341,6 @@ public class LetterQuestHud : MonoBehaviour
         return mushroomSprite;
     }
 
-    private static Sprite GetForestBranchSprite()
-    {
-        if (forestBranchSprite != null)
-        {
-            return forestBranchSprite;
-        }
-
-        const int width = 48;
-        const int height = 44;
-        Texture2D texture = CreateClearTexture(width, height);
-        Color outline = new Color32(58, 37, 22, 255);
-        Color bark = new Color32(112, 72, 38, 255);
-        Color barkLight = new Color32(158, 101, 51, 255);
-        Color leaf = new Color32(79, 151, 68, 255);
-        Color leafLight = new Color32(126, 188, 76, 255);
-
-        FillRect(texture, 7, 29, 30, 6, outline);
-        FillRect(texture, 10, 30, 26, 3, bark);
-        FillRect(texture, 14, 28, 14, 2, barkLight);
-        FillRect(texture, 27, 23, 6, 12, outline);
-        FillRect(texture, 29, 24, 3, 9, bark);
-        FillRect(texture, 12, 20, 6, 12, outline);
-        FillRect(texture, 14, 22, 3, 9, bark);
-        FillRect(texture, 8, 17, 11, 8, outline);
-        FillRect(texture, 10, 18, 8, 5, leaf);
-        FillRect(texture, 11, 18, 4, 2, leafLight);
-        FillRect(texture, 29, 13, 12, 8, outline);
-        FillRect(texture, 31, 14, 8, 5, leaf);
-        FillRect(texture, 32, 14, 4, 2, leafLight);
-        FillRect(texture, 34, 31, 7, 4, outline);
-        FillRect(texture, 35, 31, 5, 2, bark);
-
-        texture.Apply();
-        forestBranchSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
-        forestBranchSprite.name = "GeneratedForestBranchHudSprite";
-        return forestBranchSprite;
-    }
-
     private static Sprite GetGlowingLeafSprite()
     {
         if (glowingLeafSprite != null)
@@ -1356,28 +1351,24 @@ public class LetterQuestHud : MonoBehaviour
         const int width = 44;
         const int height = 44;
         Texture2D texture = CreateClearTexture(width, height);
-        Color glow = new Color32(255, 236, 95, 105);
-        Color glowStrong = new Color32(255, 240, 98, 150);
-        Color outline = new Color32(105, 89, 20, 255);
-        Color leaf = new Color32(228, 204, 49, 255);
-        Color leafLight = new Color32(255, 237, 102, 255);
-        Color vein = new Color32(145, 122, 25, 255);
+        Color glow = new Color32(255, 232, 88, 130);
+        Color outline = new Color32(105, 79, 10, 255);
+        Color leaf = new Color32(232, 207, 54, 255);
+        Color leafLight = new Color32(255, 244, 128, 255);
 
-        FillRect(texture, 12, 9, 20, 25, glow);
-        FillRect(texture, 9, 15, 26, 13, glowStrong);
-        FillRect(texture, 19, 7, 7, 5, outline);
-        FillRect(texture, 15, 10, 15, 4, outline);
-        FillRect(texture, 12, 14, 21, 7, outline);
-        FillRect(texture, 14, 21, 17, 7, outline);
-        FillRect(texture, 17, 28, 10, 5, outline);
-        FillRect(texture, 18, 10, 8, 3, leafLight);
-        FillRect(texture, 15, 14, 15, 6, leaf);
-        FillRect(texture, 16, 20, 13, 7, leaf);
-        FillRect(texture, 19, 27, 6, 4, leaf);
-        FillRect(texture, 21, 11, 3, 20, vein);
-        FillRect(texture, 18, 18, 3, 2, vein);
-        FillRect(texture, 24, 22, 3, 2, vein);
-        FillRect(texture, 18, 32, 5, 4, vein);
+        FillRect(texture, 12, 9, 20, 26, glow);
+        FillRect(texture, 16, 6, 12, 5, outline);
+        FillRect(texture, 12, 11, 20, 6, outline);
+        FillRect(texture, 9, 17, 26, 10, outline);
+        FillRect(texture, 12, 27, 20, 7, outline);
+        FillRect(texture, 17, 9, 10, 5, leafLight);
+        FillRect(texture, 14, 13, 16, 8, leaf);
+        FillRect(texture, 12, 20, 20, 6, leaf);
+        FillRect(texture, 15, 26, 14, 6, leaf);
+        FillRect(texture, 21, 13, 3, 17, outline);
+        FillRect(texture, 24, 18, 6, 2, outline);
+        FillRect(texture, 14, 22, 7, 2, outline);
+        FillRect(texture, 20, 32, 4, 6, outline);
 
         texture.Apply();
         glowingLeafSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
