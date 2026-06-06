@@ -3436,22 +3436,41 @@ public class SketchbookDrawingAnimation : MonoBehaviour
     private static void AddMiniMapOvalFenceRail(List<Vector2[]> strokes, float inset, bool leaveForestGateOpen)
     {
         List<Vector2> currentStroke = new List<Vector2>();
+        float postSpacing = Mathf.PI * 2f / MiniMapOvalFencePostCount;
+        int pointsPerPostSegment = Mathf.Max(1, Mathf.CeilToInt(MiniMapOvalFenceRailResolution / (float)MiniMapOvalFencePostCount));
 
-        for (int i = 0; i <= MiniMapOvalFenceRailResolution; i++)
+        for (int postIndex = 0; postIndex < MiniMapOvalFencePostCount; postIndex++)
         {
-            float angle = Mathf.PI * 2f * i / MiniMapOvalFenceRailResolution;
-            Vector2 mapPoint = GetMiniMapOvalFenceMapPoint(angle, inset);
+            float segmentStart = postIndex * postSpacing;
+            float segmentEnd = segmentStart + postSpacing;
 
-            if (leaveForestGateOpen && IsMiniMapVillageForestGatePoint(angle, inset))
+            for (int step = 0; step < pointsPerPostSegment; step++)
             {
-                AddCurrentMiniMapStroke(strokes, currentStroke);
-                continue;
-            }
+                float progress = step / (float)pointsPerPostSegment;
+                float angle = Mathf.Lerp(segmentStart, segmentEnd, progress);
 
-            currentStroke.Add(mapPoint);
+                if (leaveForestGateOpen && IsMiniMapVillageForestGatePoint(angle, 0f))
+                {
+                    AddCurrentMiniMapStroke(strokes, currentStroke);
+                    continue;
+                }
+
+                currentStroke.Add(GetMiniMapOvalFenceRailMapPoint(angle, inset));
+            }
+        }
+
+        if (!leaveForestGateOpen || !IsMiniMapVillageForestGatePoint(Mathf.PI * 2f, 0f))
+        {
+            currentStroke.Add(GetMiniMapOvalFenceRailMapPoint(Mathf.PI * 2f, inset));
         }
 
         AddCurrentMiniMapStroke(strokes, currentStroke);
+    }
+
+    private static Vector2 GetMiniMapOvalFenceRailMapPoint(float angle, float yInset)
+    {
+        Vector2 edge = GetMiniMapOvalFencePoint(angle, 0f);
+        return MapPoint(edge.x, edge.y - yInset);
     }
 
     private static void AddMiniMapOvalFencePosts(List<Vector2[]> strokes, bool leaveForestGateOpen)
@@ -3471,25 +3490,23 @@ public class SketchbookDrawingAnimation : MonoBehaviour
 
     private static void AddMiniMapOvalFencePost(List<Vector2[]> strokes, float angle)
     {
-        Vector2 normal = GetMiniMapOvalFenceNormal(angle);
-        Vector2 tangent = new Vector2(-normal.y, normal.x);
         Vector2 edge = GetMiniMapOvalFencePoint(angle, 0f);
-        Vector2 inner = edge - normal * MiniMapOvalFencePostLength;
-        Vector2 capBase = edge + normal * 0.08f;
-        Vector2 outer = edge + normal * 0.28f;
-        Vector2 halfTangent = tangent * MiniMapOvalFencePostHalfWidth;
+        Vector2 inner = edge - Vector2.up * MiniMapOvalFencePostLength;
+        Vector2 capBase = edge + Vector2.up * 0.08f;
+        Vector2 outer = edge + Vector2.up * 0.28f;
+        Vector2 halfWidth = Vector2.right * MiniMapOvalFencePostHalfWidth;
 
         strokes.Add(MapVectorPoints(
-            inner - halfTangent,
-            capBase - halfTangent,
+            inner - halfWidth,
+            capBase - halfWidth,
             outer,
-            capBase + halfTangent,
-            inner + halfTangent,
-            inner - halfTangent));
+            capBase + halfWidth,
+            inner + halfWidth,
+            inner - halfWidth));
 
-        Vector2 grainStart = inner + tangent * (MiniMapOvalFencePostHalfWidth * 0.36f);
-        Vector2 grainMiddle = edge + tangent * (MiniMapOvalFencePostHalfWidth * 0.18f);
-        Vector2 grainEnd = capBase + tangent * (MiniMapOvalFencePostHalfWidth * 0.1f);
+        Vector2 grainStart = inner + Vector2.right * (MiniMapOvalFencePostHalfWidth * 0.36f);
+        Vector2 grainMiddle = edge + Vector2.right * (MiniMapOvalFencePostHalfWidth * 0.18f);
+        Vector2 grainEnd = capBase + Vector2.right * (MiniMapOvalFencePostHalfWidth * 0.1f);
         strokes.Add(MapVectorPoints(grainStart, grainMiddle, grainEnd));
 
         Vector2 knot = Vector2.Lerp(inner, capBase, 0.48f);
@@ -3506,26 +3523,11 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         currentStroke.Clear();
     }
 
-    private static Vector2 GetMiniMapOvalFenceMapPoint(float angle, float inset)
-    {
-        Vector2 point = GetMiniMapOvalFencePoint(angle, inset);
-        return MapPoint(point.x, point.y);
-    }
-
     private static Vector2 GetMiniMapOvalFencePoint(float angle, float inset)
     {
         float radiusX = Mathf.Max(0.1f, MiniMapOvalFenceRadiusX - inset);
         float radiusY = Mathf.Max(0.1f, MiniMapOvalFenceRadiusY - inset);
         return new Vector2(Mathf.Cos(angle) * radiusX, Mathf.Sin(angle) * radiusY);
-    }
-
-    private static Vector2 GetMiniMapOvalFenceNormal(float angle)
-    {
-        Vector2 normal = new Vector2(
-            Mathf.Cos(angle) / Mathf.Max(0.1f, MiniMapOvalFenceRadiusX),
-            Mathf.Sin(angle) / Mathf.Max(0.1f, MiniMapOvalFenceRadiusY));
-
-        return normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector2.right;
     }
 
     private static bool IsMiniMapVillageForestGatePoint(float angle, float inset)

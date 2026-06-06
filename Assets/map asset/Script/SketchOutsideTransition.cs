@@ -5297,22 +5297,43 @@ public class SketchOutsideTransition : MonoBehaviour
     private static void AddOvalWoodRail(List<Vector3[]> strokes, float inset, bool leaveForestGateOpen)
     {
         List<Vector3> currentStroke = new List<Vector3>();
+        float postSpacing = Mathf.PI * 2f / OvalFencePostCount;
+        int pointsPerPostSegment = Mathf.Max(1, Mathf.CeilToInt(OvalFenceRailResolution / (float)OvalFencePostCount));
 
-        for (int i = 0; i <= OvalFenceRailResolution; i++)
+        for (int postIndex = 0; postIndex < OvalFencePostCount; postIndex++)
         {
-            float angle = Mathf.PI * 2f * i / OvalFenceRailResolution;
-            Vector3 point = GetOvalFencePoint(angle, inset);
+            float segmentStart = postIndex * postSpacing;
+            float segmentEnd = segmentStart + postSpacing;
 
-            if (leaveForestGateOpen && IsVillageForestGatePoint(point))
+            for (int step = 0; step < pointsPerPostSegment; step++)
             {
-                AddCurrentOvalStroke(strokes, currentStroke);
-                continue;
-            }
+                float progress = step / (float)pointsPerPostSegment;
+                float angle = Mathf.Lerp(segmentStart, segmentEnd, progress);
+                Vector3 edgePoint = GetOvalFencePoint(angle, 0f);
 
-            currentStroke.Add(point);
+                if (leaveForestGateOpen && IsVillageForestGatePoint(edgePoint))
+                {
+                    AddCurrentOvalStroke(strokes, currentStroke);
+                    continue;
+                }
+
+                currentStroke.Add(GetOvalFenceRailPoint(angle, inset));
+            }
+        }
+
+        Vector3 finalEdgePoint = GetOvalFencePoint(Mathf.PI * 2f, 0f);
+        if (!leaveForestGateOpen || !IsVillageForestGatePoint(finalEdgePoint))
+        {
+            currentStroke.Add(GetOvalFenceRailPoint(Mathf.PI * 2f, inset));
         }
 
         AddCurrentOvalStroke(strokes, currentStroke);
+    }
+
+    private static Vector3 GetOvalFenceRailPoint(float angle, float yInset)
+    {
+        Vector3 edgePoint = GetOvalFencePoint(angle, 0f);
+        return edgePoint + Vector3.down * yInset;
     }
 
     private static void AddCurrentOvalStroke(List<Vector3[]> strokes, List<Vector3> currentStroke)
@@ -5337,33 +5358,31 @@ public class SketchOutsideTransition : MonoBehaviour
                 continue;
             }
 
-            AddOvalFencePost(strokes, angle, edgePoint);
+            AddOvalFencePost(strokes, edgePoint);
         }
     }
 
-    private static void AddOvalFencePost(List<Vector3[]> strokes, float angle, Vector3 edgePoint)
+    private static void AddOvalFencePost(List<Vector3[]> strokes, Vector3 edgePoint)
     {
-        Vector2 normal = GetOvalFenceNormal(angle);
-        Vector2 tangent = new Vector2(-normal.y, normal.x);
         Vector2 edge = new Vector2(edgePoint.x, edgePoint.y);
-        Vector2 inner = edge - normal * OvalFencePostLength;
-        Vector2 capBase = edge + normal * 0.08f;
-        Vector2 outer = edge + normal * 0.28f;
-        Vector2 halfTangent = tangent * OvalFencePostHalfWidth;
+        Vector2 inner = edge - Vector2.up * OvalFencePostLength;
+        Vector2 capBase = edge + Vector2.up * 0.08f;
+        Vector2 outer = edge + Vector2.up * 0.28f;
+        Vector2 halfWidth = Vector2.right * OvalFencePostHalfWidth;
 
         strokes.Add(new[]
         {
-            ToVector3(inner - halfTangent),
-            ToVector3(capBase - halfTangent),
+            ToVector3(inner - halfWidth),
+            ToVector3(capBase - halfWidth),
             ToVector3(outer),
-            ToVector3(capBase + halfTangent),
-            ToVector3(inner + halfTangent),
-            ToVector3(inner - halfTangent)
+            ToVector3(capBase + halfWidth),
+            ToVector3(inner + halfWidth),
+            ToVector3(inner - halfWidth)
         });
 
-        Vector2 grainStart = inner + tangent * (OvalFencePostHalfWidth * 0.36f);
-        Vector2 grainMiddle = edge + tangent * (OvalFencePostHalfWidth * 0.18f);
-        Vector2 grainEnd = capBase + tangent * (OvalFencePostHalfWidth * 0.1f);
+        Vector2 grainStart = inner + Vector2.right * (OvalFencePostHalfWidth * 0.36f);
+        Vector2 grainMiddle = edge + Vector2.right * (OvalFencePostHalfWidth * 0.18f);
+        Vector2 grainEnd = capBase + Vector2.right * (OvalFencePostHalfWidth * 0.1f);
         strokes.Add(new[] { ToVector3(grainStart), ToVector3(grainMiddle), ToVector3(grainEnd) });
 
         Vector2 knot = Vector2.Lerp(inner, capBase, 0.48f);
