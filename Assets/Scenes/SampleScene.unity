@@ -657,6 +657,8 @@ MonoBehaviour:
   target: {fileID: 633801418}
   offset: {x: 0, y: 0, z: -10}
   smoothSpeed: 8
+  followDelay: 0.2
+  followFractionPerTick: 0.1
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
