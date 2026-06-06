@@ -46,6 +46,22 @@ public class SketchOutsideTransition : MonoBehaviour
     private const float OutsideMapEdgeFadeWorldWidth = 7.5f;
     private const float OuterDecorativeTreeSpacing = 2.65f;
     private const float OuterDecorativeTreeBandWidth = 7.6f;
+    private const int OuterDecorativeTreeCountMultiplier = 3;
+    private const float OvalFenceReferenceRadiusX = 21.9f;
+    private const float OvalFenceReferenceRadiusY = 17.71f;
+    private const float OvalFenceTargetRadiusX = 42f;
+    private const int OvalFenceRailResolution = 160;
+    private const int OvalFencePostCount = 72;
+    private const int OvalFenceColliderSegmentCount = 96;
+    private const float OvalFenceRailGap = 0.56f;
+    private const float OvalFenceOuterRailInset = 0.34f;
+    private const float OvalFencePostHalfWidth = 0.16f;
+    private const float OvalFencePostLength = 1.18f;
+    private const float OvalFenceColliderOuterOutset = 0.34f;
+    private const float OvalFenceColliderInnerInset = OvalFencePostLength + 0.16f;
+    private const float OuterDecorativeTreeRevealDistance = 10.5f;
+    private const int OvalFillPineCount = 30;
+    private const int OvalFillGrassCount = 90;
     private const string BackgroundEdgeFadeShaderResource = "OutsideMapEdgeFade";
     private const int ForestExtensionTreeCount = 64;
     private const int DeepForestExtensionTreeCount = 74;
@@ -107,6 +123,7 @@ public class SketchOutsideTransition : MonoBehaviour
     private static readonly Vector3 QuestNpcLetterGrassOffset = new Vector3(-2.05f, -1.35f, 0f);
     private static readonly Vector3 MapSlideStartOffset = new Vector3(0f, -1.4f, 0f);
     private static readonly Vector2 BackgroundSize = new Vector2(70f, 48f);
+    private static readonly Vector2 OutsideOvalFenceRadius = CalculateOutsideOvalFenceRadius();
     private static readonly Vector2 DeepForestSize = new Vector2(BackgroundSize.x * 0.5f, BackgroundSize.y);
     private static readonly Vector2 FourthForestSize = BackgroundSize;
     private static readonly Vector3 ForestRegionOffset = new Vector3(BackgroundSize.x, 0f, 0f);
@@ -201,9 +218,9 @@ public class SketchOutsideTransition : MonoBehaviour
     private QuestNpcLetterRewardInteract questNpcRewardInteract;
     private SketchOutsideDoorInteract houseDoorInteract;
     private BoxCollider2D houseDoorCollider;
-    private BoxCollider2D villageRightBoundaryCollider;
     private BoxCollider2D forestRightBoundaryCollider;
     private BoxCollider2D deepForestRightBoundaryCollider;
+    private readonly List<Collider2D> villageGateBoundaryColliders = new List<Collider2D>();
     private readonly List<MapRevealItem> mapRevealItems = new List<MapRevealItem>();
     private Transform boundaryRoot;
     private Transform outsidePlayer;
@@ -1151,10 +1168,7 @@ public class SketchOutsideTransition : MonoBehaviour
             rightFenceDrawing.SetStrokes(BuildFenceRightGateStrokes());
         }
 
-        if (villageRightBoundaryCollider != null)
-        {
-            villageRightBoundaryCollider.enabled = false;
-        }
+        SetCollidersEnabled(villageGateBoundaryColliders, false);
 
         CreateVillageForestGateColliders();
         CreateForestExtensionBoundary();
@@ -1251,23 +1265,47 @@ public class SketchOutsideTransition : MonoBehaviour
         }
 
         hasCreatedVillageForestGateColliders = true;
+        SetCollidersEnabled(villageGateBoundaryColliders, false);
 
         float halfWidth = BackgroundSize.x * 0.5f;
         float halfHeight = BackgroundSize.y * 0.5f;
         float thickness = BoundaryColliderThickness;
-        float colliderX = halfWidth + thickness * 0.5f;
-        float segmentHeight = Mathf.Max(0.1f, halfHeight - ForestGateHalfHeight + thickness);
+        float forestLeft = ForestRegionOffset.x - halfWidth;
 
-        CreateBoundaryCollider(
-            "GeneratedOutsideBoundary_RightGateTop",
-            boundaryRoot,
-            new Vector2(colliderX, (ForestGateHalfHeight + halfHeight) * 0.5f),
-            new Vector2(thickness, segmentHeight));
-        CreateBoundaryCollider(
-            "GeneratedOutsideBoundary_RightGateBottom",
-            boundaryRoot,
-            new Vector2(colliderX, (-ForestGateHalfHeight - halfHeight) * 0.5f),
-            new Vector2(thickness, segmentHeight));
+        DestroyGeneratedChildrenWithPrefix(boundaryRoot, "GeneratedVillageForestSeamBoundary_");
+        CreateVillageForestSeamFillColliders(forestLeft, halfHeight, thickness);
+    }
+
+    private void CreateVillageForestSeamFillColliders(float forestLeft, float halfHeight, float thickness)
+    {
+        const int seamSegmentCount = 8;
+        float firstY = ForestGateHalfHeight + thickness * 0.5f;
+        float lastY = halfHeight - thickness * 0.5f;
+        float rightEdge = forestLeft + thickness * 0.5f;
+
+        for (int i = 0; i < seamSegmentCount; i++)
+        {
+            float t = (i + 0.5f) / seamSegmentCount;
+            float y = Mathf.Lerp(firstY, lastY, t);
+            float leftEdge = GetOutsideOvalExteriorRightXAtYBand(y, thickness * 0.5f);
+            float width = rightEdge - leftEdge;
+
+            if (width <= 0.05f)
+            {
+                continue;
+            }
+
+            CreateBoundaryCollider(
+                $"GeneratedVillageForestSeamFill_Top_{i:00}",
+                boundaryRoot,
+                new Vector2((leftEdge + rightEdge) * 0.5f, y),
+                new Vector2(width, thickness));
+            CreateBoundaryCollider(
+                $"GeneratedVillageForestSeamFill_Bottom_{i:00}",
+                boundaryRoot,
+                new Vector2((leftEdge + rightEdge) * 0.5f, -y),
+                new Vector2(width, thickness));
+        }
     }
 
     private void CreateForestExtensionBoundary()
@@ -1281,6 +1319,10 @@ public class SketchOutsideTransition : MonoBehaviour
         float halfHeight = BackgroundSize.y * 0.5f;
         float thickness = BoundaryColliderThickness;
         float centerX = ForestRegionOffset.x;
+        float forestRightEdge = centerX + halfWidth + thickness;
+        float extendedLeftEdge = GetOutsideOvalExteriorRightXAtYBand(halfHeight + thickness * 0.5f, thickness * 0.5f);
+        float horizontalCenterX = (extendedLeftEdge + forestRightEdge) * 0.5f;
+        float horizontalWidth = Mathf.Max(0.1f, forestRightEdge - extendedLeftEdge);
 
         forestRightBoundaryCollider = CreateBoundaryCollider(
             "GeneratedForestExtensionBoundary_Right",
@@ -1290,13 +1332,13 @@ public class SketchOutsideTransition : MonoBehaviour
         CreateBoundaryCollider(
             "GeneratedForestExtensionBoundary_Top",
             boundaryRoot,
-            new Vector2(centerX, halfHeight + thickness * 0.5f),
-            new Vector2(BackgroundSize.x + thickness * 2f, thickness));
+            new Vector2(horizontalCenterX, halfHeight + thickness * 0.5f),
+            new Vector2(horizontalWidth, thickness));
         CreateBoundaryCollider(
             "GeneratedForestExtensionBoundary_Bottom",
             boundaryRoot,
-            new Vector2(centerX, -halfHeight - thickness * 0.5f),
-            new Vector2(BackgroundSize.x + thickness * 2f, thickness));
+            new Vector2(horizontalCenterX, -halfHeight - thickness * 0.5f),
+            new Vector2(horizontalWidth, thickness));
     }
 
     private void CreateForestExtensionPath()
@@ -1824,7 +1866,7 @@ public class SketchOutsideTransition : MonoBehaviour
         CreateOuterDecorativePines("GeneratedOuterDecorativePine_FourthForest", FourthForestRegionOffset, FourthForestSize, DecorationRandomSeed + 389);
     }
 
-    private void CreateOuterDecorativePines(string objectPrefix, Vector3 regionCenter, Vector2 regionSize, int randomSeed)
+    private void CreateOuterDecorativePines(string objectPrefix, Vector3 regionCenter, Vector2 regionSize, int randomSeed, bool revealImmediately = false, float revealDistance = MapRevealDistance)
     {
         if (propRoot == null)
         {
@@ -1834,7 +1876,7 @@ public class SketchOutsideTransition : MonoBehaviour
         System.Random random = new System.Random(randomSeed);
         List<DecorationFootprint> usedFootprints = new List<DecorationFootprint>();
         float perimeter = (regionSize.x + regionSize.y) * 2f;
-        int targetCount = Mathf.Max(10, Mathf.RoundToInt(perimeter / OuterDecorativeTreeSpacing * 0.38f));
+        int targetCount = Mathf.Max(10, Mathf.RoundToInt(perimeter / OuterDecorativeTreeSpacing * 0.38f * OuterDecorativeTreeCountMultiplier));
 
         for (int i = 0; i < targetCount; i++)
         {
@@ -1847,12 +1889,12 @@ public class SketchOutsideTransition : MonoBehaviour
             }
 
             Vector3 localPosition = new Vector3(position.x, position.y, 0f);
-            CreateDecorativePineTree($"{objectPrefix}_{i:00}", localPosition, scale, TreeSortingOrder - 1, propRoot.transform);
+            CreateDecorativePineTree($"{objectPrefix}_{i:00}", localPosition, scale, TreeSortingOrder - 1, propRoot.transform, revealImmediately, revealDistance);
             usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
         }
     }
 
-    private SketchWorldLineDrawing CreateDecorativePineTree(string objectName, Vector3 localPosition, float scale, int sortingOrder, Transform parent)
+    private SketchWorldLineDrawing CreateDecorativePineTree(string objectName, Vector3 localPosition, float scale, int sortingOrder, Transform parent, bool revealImmediately = false, float revealDistance = MapRevealDistance)
     {
         SketchWorldLineDrawing pineTree = CreateLineDrawing(
             objectName,
@@ -1863,8 +1905,16 @@ public class SketchOutsideTransition : MonoBehaviour
         TreeCrayonColorTarget colorTarget = pineTree.gameObject.AddComponent<TreeCrayonColorTarget>();
         colorTarget.Configure(scale);
 
-        RegisterLineReveal(pineTree, localPosition);
-        CreatePropGroundStroke(objectName, localPosition, 1.16f * scale, sortingOrder - 1, parent);
+        if (revealImmediately)
+        {
+            pineTree.RevealProgress = 1f;
+        }
+        else
+        {
+            RegisterLineReveal(pineTree, revealDistance, localPosition);
+        }
+
+        CreatePropGroundStroke(objectName, localPosition, 1.16f * scale, sortingOrder - 1, parent, revealImmediately, revealDistance);
 
         if (GameProgress.HasColoredVillageGreen)
         {
@@ -1876,7 +1926,29 @@ public class SketchOutsideTransition : MonoBehaviour
             CreateTreeTrunkOverlay(colorTarget, pineTree, sortingOrder + 3);
         }
 
+        if (revealImmediately)
+        {
+            RevealLineDrawingsImmediately(pineTree.transform);
+        }
+
         return pineTree;
+    }
+
+    private static void RevealLineDrawingsImmediately(Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        SketchWorldLineDrawing[] drawings = root.GetComponentsInChildren<SketchWorldLineDrawing>(true);
+        for (int i = 0; i < drawings.Length; i++)
+        {
+            if (drawings[i] != null)
+            {
+                drawings[i].RevealProgress = 1f;
+            }
+        }
     }
 
     private void CreateFourthForestBigTree()
@@ -2396,14 +2468,7 @@ public class SketchOutsideTransition : MonoBehaviour
         leafOverlay.Configure(HouseLineWidth * 3.6f, VillageGreenColor, sortingOrder);
         leafOverlay.SetStrokes(BuildPineLeafStrokes(colorTarget.TreeScale));
 
-        if (sourceDrawing != null && sourceDrawing.RevealProgress >= 0.95f)
-        {
-            leafOverlay.RevealProgress = 1f;
-        }
-        else
-        {
-            RegisterLineReveal(leafOverlay, colorTarget.transform.localPosition);
-        }
+        SyncTreeCrayonOverlayReveal(sourceDrawing, leafOverlay);
     }
 
     private void ApplyFourthForestBigTreeGreenColoring()
@@ -2637,17 +2702,11 @@ public class SketchOutsideTransition : MonoBehaviour
 
     private void ApplyFenceBrownColoring()
     {
-        float halfWidth = BackgroundSize.x * 0.5f;
-        float halfHeight = BackgroundSize.y * 0.5f;
-
-        CreateFenceBrownOverlay("GeneratedOutsideFence_Top", "GeneratedOutsideFenceBrown_Top", Vector3.zero, BuildFenceTopStrokes(), BuildHorizontalFenceRevealPoints(halfHeight, halfWidth));
-        CreateFenceBrownOverlay("GeneratedOutsideFence_Bottom", "GeneratedOutsideFenceBrown_Bottom", Vector3.zero, BuildFenceBottomStrokes(), BuildHorizontalFenceRevealPoints(-halfHeight, halfWidth));
-        CreateFenceBrownOverlay("GeneratedOutsideFence_Left", "GeneratedOutsideFenceBrown_Left", Vector3.zero, BuildFenceLeftStrokes(), BuildVerticalFenceRevealPoints(-halfWidth, halfHeight));
-
-        List<Vector3[]> rightFenceStrokes = GameProgress.HasDrawnForestSketch
+        bool hasForestGate = GameProgress.HasDrawnForestSketch;
+        List<Vector3[]> fenceStrokes = hasForestGate
             ? BuildFenceRightGateStrokes()
             : BuildFenceRightStrokes();
-        CreateFenceBrownOverlay("GeneratedOutsideFence_Right", "GeneratedOutsideFenceBrown_Right", Vector3.zero, rightFenceStrokes, BuildVerticalFenceRevealPoints(halfWidth, halfHeight));
+        CreateFenceBrownOverlay("GeneratedOutsideFence_Oval", "GeneratedOutsideFenceBrown_Oval", Vector3.zero, fenceStrokes, BuildOvalFenceRevealPoints(hasForestGate));
 
         RemoveExtensionFenceLinework();
     }
@@ -2738,14 +2797,25 @@ public class SketchOutsideTransition : MonoBehaviour
         trunkOverlay.Configure(HouseLineWidth * 2.25f, BrownCrayonColor, sortingOrder);
         trunkOverlay.SetStrokes(BuildPineTrunkBrownStrokes(colorTarget.TreeScale));
 
-        if (sourceDrawing != null && sourceDrawing.RevealProgress >= 0.95f)
+        SyncTreeCrayonOverlayReveal(sourceDrawing, trunkOverlay);
+    }
+
+    private static void SyncTreeCrayonOverlayReveal(SketchWorldLineDrawing sourceDrawing, SketchWorldLineDrawing overlayDrawing)
+    {
+        if (overlayDrawing == null)
         {
-            trunkOverlay.RevealProgress = 1f;
+            return;
         }
-        else
+
+        if (sourceDrawing == null)
         {
-            RegisterLineReveal(trunkOverlay, colorTarget.transform.localPosition);
+            overlayDrawing.RevealProgress = 0f;
+            return;
         }
+
+        overlayDrawing.RevealProgress = sourceDrawing.RevealProgress;
+        TreeCrayonRevealSync revealSync = overlayDrawing.gameObject.AddComponent<TreeCrayonRevealSync>();
+        revealSync.Configure(sourceDrawing, overlayDrawing);
     }
 
     private void CreateLeafPileBrownOverlay(LeafPileCrayonColorTarget colorTarget, SketchWorldLineDrawing sourceDrawing)
@@ -3566,31 +3636,16 @@ public class SketchOutsideTransition : MonoBehaviour
 
     private void CreateOutsideBoundary()
     {
-        float halfWidth = BackgroundSize.x * 0.5f;
-        float halfHeight = BackgroundSize.y * 0.5f;
-        float thickness = BoundaryColliderThickness;
-
         Color fenceColor = new Color32(86, 58, 34, 255);
-        SketchWorldLineDrawing topFence = CreateLineDrawing("GeneratedOutsideFence_Top", Vector3.zero, BuildFenceTopStrokes(), PropSortingOrder + 3, propRoot.transform, fenceColor);
-        RegisterLineReveal(topFence, FenceRevealDistance, BuildHorizontalFenceRevealPoints(halfHeight, halfWidth));
-
-        SketchWorldLineDrawing bottomFence = CreateLineDrawing("GeneratedOutsideFence_Bottom", Vector3.zero, BuildFenceBottomStrokes(), PropSortingOrder + 3, propRoot.transform, fenceColor);
-        RegisterLineReveal(bottomFence, FenceRevealDistance, BuildHorizontalFenceRevealPoints(-halfHeight, halfWidth));
-
-        SketchWorldLineDrawing leftFence = CreateLineDrawing("GeneratedOutsideFence_Left", Vector3.zero, BuildFenceLeftStrokes(), PropSortingOrder + 3, propRoot.transform, fenceColor);
-        RegisterLineReveal(leftFence, FenceRevealDistance, BuildVerticalFenceRevealPoints(-halfWidth, halfHeight));
-
-        rightFenceDrawing = CreateLineDrawing("GeneratedOutsideFence_Right", Vector3.zero, BuildFenceRightStrokes(), PropSortingOrder + 3, propRoot.transform, fenceColor);
-        RegisterLineReveal(rightFenceDrawing, FenceRevealDistance, BuildVerticalFenceRevealPoints(halfWidth, halfHeight));
+        bool hasForestGate = GameProgress.HasDrawnForestSketch;
+        rightFenceDrawing = CreateLineDrawing("GeneratedOutsideFence_Oval", Vector3.zero, hasForestGate ? BuildFenceRightGateStrokes() : BuildFenceRightStrokes(), PropSortingOrder + 3, propRoot.transform, fenceColor);
+        RegisterLineReveal(rightFenceDrawing, FenceRevealDistance, BuildOvalFenceRevealPoints(hasForestGate));
 
         GameObject boundaryRootObject = new GameObject("GeneratedOutsideBoundaryColliders");
         boundaryRootObject.transform.SetParent(propRoot.transform, false);
         boundaryRoot = boundaryRootObject.transform;
-
-        CreateBoundaryCollider("GeneratedOutsideBoundary_Left", boundaryRoot, new Vector2(-halfWidth - thickness * 0.5f, 0f), new Vector2(thickness, BackgroundSize.y + thickness * 2f));
-        villageRightBoundaryCollider = CreateBoundaryCollider("GeneratedOutsideBoundary_Right", boundaryRoot, new Vector2(halfWidth + thickness * 0.5f, 0f), new Vector2(thickness, BackgroundSize.y + thickness * 2f));
-        CreateBoundaryCollider("GeneratedOutsideBoundary_Top", boundaryRoot, new Vector2(0f, halfHeight + thickness * 0.5f), new Vector2(BackgroundSize.x + thickness * 2f, thickness));
-        CreateBoundaryCollider("GeneratedOutsideBoundary_Bottom", boundaryRoot, new Vector2(0f, -halfHeight - thickness * 0.5f), new Vector2(BackgroundSize.x + thickness * 2f, thickness));
+        villageGateBoundaryColliders.Clear();
+        CreateOvalBoundaryColliders(boundaryRoot, hasForestGate);
     }
 
     private void CreateOutsidePaths()
@@ -3759,6 +3814,102 @@ public class SketchOutsideTransition : MonoBehaviour
         return collider;
     }
 
+    private void CreateOvalBoundaryColliders(Transform parent, bool leaveForestGateOpen)
+    {
+        if (parent == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < OvalFenceColliderSegmentCount; i++)
+        {
+            float startAngle = Mathf.PI * 2f * i / OvalFenceColliderSegmentCount;
+            float endAngle = Mathf.PI * 2f * (i + 1) / OvalFenceColliderSegmentCount;
+            float colliderThickness = OvalFenceColliderOuterOutset + OvalFenceColliderInnerInset;
+            float colliderNormalOffset = (OvalFenceColliderOuterOutset - OvalFenceColliderInnerInset) * 0.5f;
+            Vector2 baseStart = GetOvalFenceColliderPoint(startAngle);
+            Vector2 baseEnd = GetOvalFenceColliderPoint(endAngle);
+            Vector2 start = GetOvalFenceColliderPoint(startAngle, colliderNormalOffset);
+            Vector2 end = GetOvalFenceColliderPoint(endAngle, colliderNormalOffset);
+            Vector2 baseMidpoint = (baseStart + baseEnd) * 0.5f;
+            bool isGateSegment = IsVillageForestGatePoint(new Vector3(baseMidpoint.x, baseMidpoint.y, 0f));
+
+            if (leaveForestGateOpen && isGateSegment)
+            {
+                continue;
+            }
+
+            BoxCollider2D collider = CreateBoundarySegmentCollider(
+                $"GeneratedOutsideBoundary_Oval_{i:00}",
+                parent,
+                start,
+                end,
+                colliderThickness);
+
+            if (isGateSegment)
+            {
+                villageGateBoundaryColliders.Add(collider);
+            }
+        }
+    }
+
+    private BoxCollider2D CreateBoundarySegmentCollider(string objectName, Transform parent, Vector2 start, Vector2 end, float thickness)
+    {
+        GameObject colliderObject = new GameObject(objectName);
+        colliderObject.transform.SetParent(parent, false);
+
+        Vector2 midpoint = (start + end) * 0.5f;
+        Vector2 delta = end - start;
+        float length = Mathf.Max(0.1f, delta.magnitude);
+
+        colliderObject.transform.localPosition = new Vector3(midpoint.x, midpoint.y, 0f);
+        colliderObject.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+
+        BoxCollider2D collider = colliderObject.AddComponent<BoxCollider2D>();
+        collider.size = new Vector2(length + 0.08f, thickness);
+        collider.isTrigger = false;
+        return collider;
+    }
+
+    private static Vector2 GetOvalFenceColliderPoint(float angle, float normalOffset = 0f)
+    {
+        Vector2 point = new Vector2(
+            Mathf.Cos(angle) * OutsideOvalFenceRadius.x,
+            Mathf.Sin(angle) * OutsideOvalFenceRadius.y);
+
+        return point + GetOvalFenceNormal(angle) * normalOffset;
+    }
+
+    private static float GetOutsideOvalRightXAtY(float y, float inset = 0f)
+    {
+        float radiusX = Mathf.Max(0.1f, OutsideOvalFenceRadius.x - inset);
+        float radiusY = Mathf.Max(0.1f, OutsideOvalFenceRadius.y - inset);
+        float normalizedY = Mathf.Clamp(Mathf.Abs(y) / radiusY, 0f, 1f);
+        return Mathf.Sqrt(Mathf.Max(0f, 1f - normalizedY * normalizedY)) * radiusX;
+    }
+
+    private static float GetOutsideOvalExteriorRightXAtYBand(float centerY, float halfBandHeight)
+    {
+        float closestToCenterY = Mathf.Max(0f, Mathf.Abs(centerY) - Mathf.Max(0f, halfBandHeight));
+        return GetOutsideOvalRightXAtY(closestToCenterY) + halfBandHeight;
+    }
+
+    private static void SetCollidersEnabled(List<Collider2D> colliders, bool enabled)
+    {
+        if (colliders == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < colliders.Count; i++)
+        {
+            if (colliders[i] != null)
+            {
+                colliders[i].enabled = enabled;
+            }
+        }
+    }
+
     private void CreateRandomOutsideDecorations()
     {
         System.Random random = new System.Random(DecorationRandomSeed);
@@ -3770,6 +3921,81 @@ public class SketchOutsideTransition : MonoBehaviour
         CreateQuestNpcLetterGrass(usedFootprints);
         SpawnRandomPineTrees("GeneratedPineTree", TreeSpawnCount, 6.2f, TreeScaleRange.x, TreeScaleRange.y, TreeSortingOrder, random, usedFootprints, -31f, 31f, DecorationMin.y, 12.5f);
         SpawnRandomSpriteProps("GeneratedGrass", GrassResourcePath, GrassSpawnCount, 2.1f, GrassScaleRange.x, GrassScaleRange.y, GrassSortingOrder, random, usedFootprints, DecorationMin.x, DecorationMax.x, DecorationMin.y, DecorationMax.y);
+        CreateOvalFillDecorations(random, usedFootprints);
+        CreateOuterDecorativePines(
+            "GeneratedOuterDecorativePine_Village",
+            Vector3.zero,
+            OutsideOvalFenceRadius * 2f,
+            DecorationRandomSeed + 263,
+            false,
+            OuterDecorativeTreeRevealDistance);
+    }
+
+    private void CreateOvalFillDecorations(System.Random random, List<DecorationFootprint> usedFootprints)
+    {
+        if (propRoot == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < OvalFillPineCount; i++)
+        {
+            float scale = RandomRange(random, TreeScaleRange.x * 0.78f, TreeScaleRange.y * 0.96f);
+            Vector2 halfSize = GetPineDecorationHalfSize(scale);
+
+            if (!TryPickOvalFillDecorationPosition(random, usedFootprints, halfSize, 3.35f, 0.5f, out Vector2 position))
+            {
+                continue;
+            }
+
+            CreateDecorativePineTree(
+                $"GeneratedOvalFillPine_{i:00}",
+                new Vector3(position.x, position.y, 0f),
+                scale,
+                TreeSortingOrder,
+                propRoot.transform);
+            usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
+        }
+
+        Sprite grassSprite = LoadSketchSprite(GrassResourcePath);
+        if (grassSprite == null)
+        {
+            Debug.LogWarning($"Outside prop sprite not found: {GrassResourcePath}", this);
+            return;
+        }
+
+        for (int i = 0; i < OvalFillGrassCount; i++)
+        {
+            float scale = RandomRange(random, GrassScaleRange.x * 0.92f, GrassScaleRange.y * 1.08f);
+            float scaleX = random.NextDouble() < 0.5d ? -scale : scale;
+            Vector3 localScale = new Vector3(scaleX, scale, 1f);
+            Vector2 halfSize = GetDecorationHalfSize(grassSprite, localScale);
+
+            if (!TryPickOvalFillDecorationPosition(random, usedFootprints, halfSize, 1.05f, 0.34f, out Vector2 position))
+            {
+                continue;
+            }
+
+            Transform grassTransform = CreateSpriteProp(
+                $"GeneratedGrassOvalFill_{i:00}",
+                grassSprite,
+                new Vector3(position.x, position.y, 0f),
+                localScale,
+                GrassSortingOrder,
+                propRoot.transform,
+                true);
+
+            if (grassTransform != null)
+            {
+                GrassSwayOnPlayerNear grassSway = grassTransform.GetComponent<GrassSwayOnPlayerNear>();
+                if (grassSway != null)
+                {
+                    grassSway.SuppressRewardSpawns();
+                }
+            }
+
+            usedFootprints.Add(BuildDecorationFootprint(position, halfSize));
+        }
     }
 
     private void CreateQuestNpcLetterGrass(List<DecorationFootprint> usedFootprints)
@@ -3975,6 +4201,84 @@ public class SketchOutsideTransition : MonoBehaviour
         return false;
     }
 
+    private bool TryPickOvalFillDecorationPosition(
+        System.Random random,
+        List<DecorationFootprint> usedFootprints,
+        Vector2 halfSize,
+        float minimumSpacing,
+        float minimumNormalizedDistance,
+        out Vector2 position)
+    {
+        float minimumSpacingSqr = minimumSpacing * minimumSpacing;
+        float margin = Mathf.Max(halfSize.x, halfSize.y) + 0.55f;
+        float minX = -OutsideOvalFenceRadius.x + margin;
+        float maxX = OutsideOvalFenceRadius.x - margin;
+        float minY = -OutsideOvalFenceRadius.y + margin;
+        float maxY = OutsideOvalFenceRadius.y - margin;
+
+        for (int attempt = 0; attempt < DecorationPickAttempts; attempt++)
+        {
+            position = new Vector2(
+                RandomRange(random, minX, maxX),
+                RandomRange(random, minY, maxY));
+
+            if (!IsInsideOutsideOval(position, margin)
+                || GetOutsideOvalNormalizedDistance(position) < minimumNormalizedDistance
+                || IsVillageForestGateFillBlocked(position)
+                || IsInsideClearZone(position))
+            {
+                continue;
+            }
+
+            DecorationFootprint candidate = BuildDecorationFootprint(position, halfSize);
+            if (DoesFootprintOverlapOutsidePath(candidate))
+            {
+                continue;
+            }
+
+            bool hasEnoughSpace = true;
+            for (int i = 0; i < usedFootprints.Count; i++)
+            {
+                if (DoFootprintsOverlap(candidate, usedFootprints[i])
+                    || (usedFootprints[i].GroundPosition - position).sqrMagnitude < minimumSpacingSqr)
+                {
+                    hasEnoughSpace = false;
+                    break;
+                }
+            }
+
+            if (hasEnoughSpace)
+            {
+                return true;
+            }
+        }
+
+        position = Vector2.zero;
+        return false;
+    }
+
+    private static bool IsInsideOutsideOval(Vector2 position, float inset)
+    {
+        float radiusX = Mathf.Max(0.1f, OutsideOvalFenceRadius.x - inset);
+        float radiusY = Mathf.Max(0.1f, OutsideOvalFenceRadius.y - inset);
+        return (position.x * position.x) / (radiusX * radiusX)
+            + (position.y * position.y) / (radiusY * radiusY) <= 1f;
+    }
+
+    private static float GetOutsideOvalNormalizedDistance(Vector2 position)
+    {
+        float radiusX = Mathf.Max(0.1f, OutsideOvalFenceRadius.x);
+        float radiusY = Mathf.Max(0.1f, OutsideOvalFenceRadius.y);
+        return (position.x * position.x) / (radiusX * radiusX)
+            + (position.y * position.y) / (radiusY * radiusY);
+    }
+
+    private static bool IsVillageForestGateFillBlocked(Vector2 position)
+    {
+        return position.x > OutsideOvalFenceRadius.x * 0.64f
+            && Mathf.Abs(position.y) <= ForestGateHalfHeight + 3.4f;
+    }
+
     private static Vector2 GetDecorationHalfSize(Sprite sprite, Vector3 localScale)
     {
         return new Vector2(
@@ -4168,7 +4472,7 @@ public class SketchOutsideTransition : MonoBehaviour
         return treeInteract;
     }
 
-    private void CreatePropGroundStroke(string objectName, Vector3 localPosition, float halfWidth, int sortingOrder, Transform parent)
+    private void CreatePropGroundStroke(string objectName, Vector3 localPosition, float halfWidth, int sortingOrder, Transform parent, bool revealImmediately = false, float revealDistance = MapRevealDistance)
     {
         float strokeHalfWidth = Mathf.Clamp(halfWidth * 0.72f, 0.45f, 2.2f);
         float unevenLift = Mathf.Clamp(strokeHalfWidth * 0.08f, 0.04f, 0.12f);
@@ -4183,7 +4487,14 @@ public class SketchOutsideTransition : MonoBehaviour
             strokes,
             sortingOrder,
             parent);
-        RegisterLineReveal(groundStroke, localPosition);
+        if (revealImmediately)
+        {
+            groundStroke.RevealProgress = 1f;
+        }
+        else
+        {
+            RegisterLineReveal(groundStroke, revealDistance, localPosition);
+        }
     }
 
     private static Sprite LoadSketchSprite(string resourcePath)
@@ -4960,6 +5271,157 @@ public class SketchOutsideTransition : MonoBehaviour
         return points;
     }
 
+    private static Vector2 CalculateOutsideOvalFenceRadius()
+    {
+        float aspect = OvalFenceReferenceRadiusY / OvalFenceReferenceRadiusX;
+        return new Vector2(OvalFenceTargetRadiusX, OvalFenceTargetRadiusX * aspect);
+    }
+
+    private static List<Vector3[]> BuildOvalFenceStrokes(bool leaveForestGateOpen)
+    {
+        List<Vector3[]> strokes = new List<Vector3[]>();
+
+        AddOvalWoodRail(strokes, OvalFenceOuterRailInset, leaveForestGateOpen);
+        AddOvalWoodRail(strokes, OvalFenceOuterRailInset + OvalFenceRailGap, leaveForestGateOpen);
+        AddOvalFencePosts(strokes, leaveForestGateOpen);
+
+        if (leaveForestGateOpen)
+        {
+            float right = OutsideOvalFenceRadius.x - OvalFencePostLength * 0.86f;
+            strokes.Add(Points(right, ForestGateHalfHeight, right - 1.05f, 1.18f, right, -ForestGateHalfHeight));
+        }
+
+        return strokes;
+    }
+
+    private static void AddOvalWoodRail(List<Vector3[]> strokes, float inset, bool leaveForestGateOpen)
+    {
+        List<Vector3> currentStroke = new List<Vector3>();
+
+        for (int i = 0; i <= OvalFenceRailResolution; i++)
+        {
+            float angle = Mathf.PI * 2f * i / OvalFenceRailResolution;
+            Vector3 point = GetOvalFencePoint(angle, inset);
+
+            if (leaveForestGateOpen && IsVillageForestGatePoint(point))
+            {
+                AddCurrentOvalStroke(strokes, currentStroke);
+                continue;
+            }
+
+            currentStroke.Add(point);
+        }
+
+        AddCurrentOvalStroke(strokes, currentStroke);
+    }
+
+    private static void AddCurrentOvalStroke(List<Vector3[]> strokes, List<Vector3> currentStroke)
+    {
+        if (currentStroke.Count >= 2)
+        {
+            strokes.Add(currentStroke.ToArray());
+        }
+
+        currentStroke.Clear();
+    }
+
+    private static void AddOvalFencePosts(List<Vector3[]> strokes, bool leaveForestGateOpen)
+    {
+        for (int i = 0; i < OvalFencePostCount; i++)
+        {
+            float angle = Mathf.PI * 2f * i / OvalFencePostCount;
+            Vector3 edgePoint = GetOvalFencePoint(angle, 0f);
+
+            if (leaveForestGateOpen && IsVillageForestGatePoint(edgePoint))
+            {
+                continue;
+            }
+
+            AddOvalFencePost(strokes, angle, edgePoint);
+        }
+    }
+
+    private static void AddOvalFencePost(List<Vector3[]> strokes, float angle, Vector3 edgePoint)
+    {
+        Vector2 normal = GetOvalFenceNormal(angle);
+        Vector2 tangent = new Vector2(-normal.y, normal.x);
+        Vector2 edge = new Vector2(edgePoint.x, edgePoint.y);
+        Vector2 inner = edge - normal * OvalFencePostLength;
+        Vector2 capBase = edge + normal * 0.08f;
+        Vector2 outer = edge + normal * 0.28f;
+        Vector2 halfTangent = tangent * OvalFencePostHalfWidth;
+
+        strokes.Add(new[]
+        {
+            ToVector3(inner - halfTangent),
+            ToVector3(capBase - halfTangent),
+            ToVector3(outer),
+            ToVector3(capBase + halfTangent),
+            ToVector3(inner + halfTangent),
+            ToVector3(inner - halfTangent)
+        });
+
+        Vector2 grainStart = inner + tangent * (OvalFencePostHalfWidth * 0.36f);
+        Vector2 grainMiddle = edge + tangent * (OvalFencePostHalfWidth * 0.18f);
+        Vector2 grainEnd = capBase + tangent * (OvalFencePostHalfWidth * 0.1f);
+        strokes.Add(new[] { ToVector3(grainStart), ToVector3(grainMiddle), ToVector3(grainEnd) });
+
+        Vector2 knot = Vector2.Lerp(inner, capBase, 0.48f);
+        strokes.Add(EllipsePoints(knot.x, knot.y, 0.055f, OvalFencePostHalfWidth * 0.34f, 8));
+    }
+
+    private static Vector3 GetOvalFencePoint(float angle, float inset)
+    {
+        float radiusX = Mathf.Max(0.1f, OutsideOvalFenceRadius.x - inset);
+        float radiusY = Mathf.Max(0.1f, OutsideOvalFenceRadius.y - inset);
+        return new Vector3(
+            Mathf.Cos(angle) * radiusX,
+            Mathf.Sin(angle) * radiusY,
+            0f);
+    }
+
+    private static Vector2 GetOvalFenceNormal(float angle)
+    {
+        float cos = Mathf.Cos(angle);
+        float sin = Mathf.Sin(angle);
+        Vector2 normal = new Vector2(
+            cos / Mathf.Max(0.1f, OutsideOvalFenceRadius.x),
+            sin / Mathf.Max(0.1f, OutsideOvalFenceRadius.y));
+
+        return normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector2.right;
+    }
+
+    private static bool IsVillageForestGatePoint(Vector3 point)
+    {
+        return point.x > OutsideOvalFenceRadius.x * 0.72f && Mathf.Abs(point.y) <= ForestGateHalfHeight;
+    }
+
+    private static Vector3[] BuildOvalFenceRevealPoints(bool leaveForestGateOpen)
+    {
+        int pointCount = Mathf.Max(16, Mathf.CeilToInt(Mathf.PI * 2f * Mathf.Max(OutsideOvalFenceRadius.x, OutsideOvalFenceRadius.y) / FenceRevealTriggerSpacing));
+        List<Vector3> points = new List<Vector3>();
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            float angle = Mathf.PI * 2f * i / pointCount;
+            Vector3 point = GetOvalFencePoint(angle, 0f);
+
+            if (leaveForestGateOpen && IsVillageForestGatePoint(point))
+            {
+                continue;
+            }
+
+            points.Add(point);
+        }
+
+        return points.ToArray();
+    }
+
+    private static Vector3 ToVector3(Vector2 point)
+    {
+        return new Vector3(point.x, point.y, 0f);
+    }
+
     private static List<Vector3[]> BuildFenceTopStrokes()
     {
         List<Vector3[]> strokes = new List<Vector3[]>();
@@ -4992,25 +5454,12 @@ public class SketchOutsideTransition : MonoBehaviour
 
     private static List<Vector3[]> BuildFenceRightStrokes()
     {
-        List<Vector3[]> strokes = new List<Vector3[]>();
-        float right = BackgroundSize.x * 0.5f - 0.45f;
-        float bottom = -BackgroundSize.y * 0.5f + 0.45f;
-        float top = BackgroundSize.y * 0.5f - 0.45f;
-        AddVerticalWoodFence(strokes, right, bottom, top, -1f);
-        return strokes;
+        return BuildOvalFenceStrokes(false);
     }
 
     private static List<Vector3[]> BuildFenceRightGateStrokes()
     {
-        List<Vector3[]> strokes = new List<Vector3[]>();
-        float right = BackgroundSize.x * 0.5f - 0.45f;
-        float bottom = -BackgroundSize.y * 0.5f + 0.45f;
-        float top = BackgroundSize.y * 0.5f - 0.45f;
-
-        AddVerticalWoodFence(strokes, right, bottom, -ForestGateHalfHeight, -1f);
-        AddVerticalWoodFence(strokes, right, ForestGateHalfHeight, top, -1f);
-        strokes.Add(Points(right - 0.8f, ForestGateHalfHeight, right - 1.36f, 1.18f, right - 0.8f, -ForestGateHalfHeight));
-        return strokes;
+        return BuildOvalFenceStrokes(true);
     }
 
     private static List<Vector3[]> BuildForestExtensionBoundaryStrokes()
@@ -11645,6 +12094,34 @@ public class TreeCrayonColorTarget : MonoBehaviour
     public void Configure(float treeScale)
     {
         TreeScale = Mathf.Max(0.1f, treeScale);
+    }
+}
+
+public class TreeCrayonRevealSync : MonoBehaviour
+{
+    private SketchWorldLineDrawing sourceDrawing;
+    private SketchWorldLineDrawing overlayDrawing;
+
+    public void Configure(SketchWorldLineDrawing source, SketchWorldLineDrawing overlay)
+    {
+        sourceDrawing = source;
+        overlayDrawing = overlay;
+        SyncRevealProgress();
+    }
+
+    private void LateUpdate()
+    {
+        SyncRevealProgress();
+    }
+
+    private void SyncRevealProgress()
+    {
+        if (sourceDrawing == null || overlayDrawing == null)
+        {
+            return;
+        }
+
+        overlayDrawing.RevealProgress = sourceDrawing.RevealProgress;
     }
 }
 

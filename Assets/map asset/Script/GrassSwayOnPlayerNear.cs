@@ -3,10 +3,10 @@ using UnityEngine;
 public class GrassSwayOnPlayerNear : MonoBehaviour, IInteractable
 {
     [SerializeField] private float reactionRadius = 1.15f;
-    [SerializeField] private float maxTiltAngle = 13f;
+    [SerializeField] private float maxTiltAngle = 26f;
     [SerializeField] private float swaySpeed = 13f;
     [SerializeField] private float recoverSpeed = 8f;
-    [SerializeField] private float squashAmount = 0.08f;
+    [SerializeField] private float squashAmount = 0.16f;
     [SerializeField, Range(0f, 1f)] private float insectSpawnChance = 0.25f;
 
     private const float LetterPromptDistance = 1.45f;
@@ -29,6 +29,14 @@ public class GrassSwayOnPlayerNear : MonoBehaviour, IInteractable
     public void MarkReservedForLetterFragment()
     {
         suppressInsectSpawn = true;
+    }
+
+    public void SuppressRewardSpawns()
+    {
+        suppressInsectSpawn = true;
+        containsLetterFragment = false;
+        hasReleasedLetterFragment = false;
+        SetLetterInteractionAvailable(false);
     }
 
     public void MarkContainsLetterFragment()

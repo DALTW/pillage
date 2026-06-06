@@ -14,6 +14,7 @@ public class SketchbookDrawingAnimation : MonoBehaviour
     private const float ExtendedPencilEndLengthScale = 0.42f;
     private const float PencilMergeDuration = 1.64f;
     private const float ForestDrawDuration = 18f;
+    private const float FourthForestConnectionDrawDurationRatio = 0.28f;
     private const float GreenCrayonColorDuration = 5.6f;
     private const float BrownCrayonColorDuration = 6.2f;
     private const float BlueCrayonColorDuration = 5.4f;
@@ -22,6 +23,18 @@ public class SketchbookDrawingAnimation : MonoBehaviour
     private const float BlueCrayonLengthScale = 0.82f;
     private const float DeepForestPanelWidthScale = 0.5f;
     private const float SketchbookMapLayoutUnits = 3.5f;
+    private const float MiniMapOvalFenceReferenceRadiusX = 21.9f;
+    private const float MiniMapOvalFenceReferenceRadiusY = 17.71f;
+    private const float MiniMapOvalFenceAspect = MiniMapOvalFenceReferenceRadiusY / MiniMapOvalFenceReferenceRadiusX;
+    private const float MiniMapOvalFenceRadiusX = 42f;
+    private const float MiniMapOvalFenceRadiusY = MiniMapOvalFenceRadiusX * MiniMapOvalFenceAspect;
+    private const int MiniMapOvalFenceRailResolution = 160;
+    private const int MiniMapOvalFencePostCount = 72;
+    private const float MiniMapOvalFenceRailGap = 0.56f;
+    private const float MiniMapOvalFenceOuterRailInset = 0.34f;
+    private const float MiniMapOvalFencePostHalfWidth = 0.16f;
+    private const float MiniMapOvalFencePostLength = 1.18f;
+    private const float MiniMapForestGateHalfHeight = 3.2f;
     private const float DefaultSketchbookWidth = 1200f;
     private const float FirstPageDrawableWidth = 1200f;
     private const float RequestedDrawingHeight = 540f;
@@ -160,6 +173,7 @@ public class SketchbookDrawingAnimation : MonoBehaviour
     private float forestBrownDrawingScale = 1f;
     private float forestBlueWaterDrawingScale = 1f;
     private float deepForestDrawingScale = 1f;
+    private float deepForestFourthConnectionDrawingScale = 1f;
     private float deepForestFourthConnectionBrownDrawingScale = 1f;
     private float deepForestGreenDrawingScale = 1f;
     private float deepForestBrownDrawingScale = 1f;
@@ -230,8 +244,12 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         ApplyRequestedAnimationSettings();
         EnsureSetup();
         StopAnimation();
-        activeDrawingGraphic = fourthForestDrawingGraphic;
-        activeDrawingScale = fourthForestDrawingScale;
+        activeDrawingGraphic = deepForestFourthConnectionDrawingGraphic != null
+            ? deepForestFourthConnectionDrawingGraphic
+            : fourthForestDrawingGraphic;
+        activeDrawingScale = deepForestFourthConnectionDrawingGraphic != null
+            ? deepForestFourthConnectionDrawingScale
+            : fourthForestDrawingScale;
         pencilStartLengthScale = ExtendedPencilStartLengthScale;
         pencilEndLengthScale = ExtendedPencilEndLengthScale;
         BeginAnimation(SketchbookAnimationType.FourthForestExpansion, onComplete);
@@ -875,7 +893,16 @@ public class SketchbookDrawingAnimation : MonoBehaviour
             fourthForestBrownDrawingGraphic.RevealProgress = 0f;
         }
 
-        SetPencilParent(fourthForestDrawingRoot);
+        bool hasConnectionDrawing = deepForestFourthConnectionDrawingGraphic != null
+            && deepForestFourthConnectionDrawingRoot != null;
+        activeDrawingGraphic = hasConnectionDrawing
+            ? deepForestFourthConnectionDrawingGraphic
+            : fourthForestDrawingGraphic;
+        activeDrawingScale = hasConnectionDrawing
+            ? deepForestFourthConnectionDrawingScale
+            : fourthForestDrawingScale;
+
+        SetPencilParent(hasConnectionDrawing ? deepForestFourthConnectionDrawingRoot : fourthForestDrawingRoot);
         SetPencilTint(Color.white);
         pencilCanvasGroup.alpha = 1f;
         pencilRoot.gameObject.SetActive(true);
@@ -883,23 +910,54 @@ public class SketchbookDrawingAnimation : MonoBehaviour
 
         yield return PlayPencilMergeRoutine();
 
-        float elapsed = 0f;
-        float revealProgress = 0f;
-
-        while (elapsed < ForestDrawDuration)
+        if (hasConnectionDrawing)
         {
-            elapsed += Time.deltaTime;
-            float progress = Mathf.Clamp01(elapsed / ForestDrawDuration);
-            revealProgress = Mathf.Max(revealProgress, ApplyChildDrawingPace(progress));
+            float connectionDrawDuration = Mathf.Max(0.01f, ForestDrawDuration * FourthForestConnectionDrawDurationRatio);
+            float elapsed = 0f;
+            float revealProgress = 0f;
 
-            fourthForestDrawingGraphic.RevealProgress = revealProgress;
-            SetRevealProgress(deepForestFourthConnectionDrawingGraphic, revealProgress);
-            SetPencilAtProgress(revealProgress, elapsed, true);
+            while (elapsed < connectionDrawDuration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = Mathf.Clamp01(elapsed / connectionDrawDuration);
+                revealProgress = Mathf.Max(revealProgress, ApplyChildDrawingPace(progress));
+
+                SetRevealProgress(deepForestFourthConnectionDrawingGraphic, revealProgress);
+                SetPencilAtProgress(revealProgress, elapsed, true);
+                yield return null;
+            }
+
+            SetRevealProgress(deepForestFourthConnectionDrawingGraphic, 1f);
+            SetPencilAtProgress(1f);
+        }
+        else
+        {
+            SetRevealProgress(deepForestFourthConnectionDrawingGraphic, 1f);
+        }
+
+        activeDrawingGraphic = fourthForestDrawingGraphic;
+        activeDrawingScale = fourthForestDrawingScale;
+        SetPencilParent(fourthForestDrawingRoot);
+        SetPencilAtProgress(0f);
+
+        float fourthForestDrawDuration = hasConnectionDrawing
+            ? Mathf.Max(0.01f, ForestDrawDuration * (1f - FourthForestConnectionDrawDurationRatio))
+            : ForestDrawDuration;
+        float forestElapsed = 0f;
+        float forestRevealProgress = 0f;
+
+        while (forestElapsed < fourthForestDrawDuration)
+        {
+            forestElapsed += Time.deltaTime;
+            float progress = Mathf.Clamp01(forestElapsed / fourthForestDrawDuration);
+            forestRevealProgress = Mathf.Max(forestRevealProgress, ApplyChildDrawingPace(progress));
+
+            fourthForestDrawingGraphic.RevealProgress = forestRevealProgress;
+            SetPencilAtProgress(forestRevealProgress, forestElapsed, true);
             yield return null;
         }
 
         fourthForestDrawingGraphic.RevealProgress = 1f;
-        SetRevealProgress(deepForestFourthConnectionDrawingGraphic, 1f);
         SetPencilAtProgress(1f);
 
         bool shouldApplyGreen = GameProgress.HasColoredVillageGreen || GameProgress.HasCollectedGreenCrayon;
@@ -1720,7 +1778,7 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         deepForestFourthConnectionDrawingGraphic.LineWidth = lineWidth;
 
         List<Vector2[]> deepForestFourthConnectionStrokes = BuildSketchbookDeepForestToFourthConnectionStrokes();
-        FitStrokesToNarrowReferenceRoot(deepForestFourthConnectionStrokes, deepForestDrawingRoot, BuildSketchbookDeepForestStrokes());
+        deepForestFourthConnectionDrawingScale = FitStrokesToNarrowReferenceRoot(deepForestFourthConnectionStrokes, deepForestDrawingRoot, BuildSketchbookDeepForestStrokes());
         deepForestFourthConnectionDrawingGraphic.SetStrokes(deepForestFourthConnectionStrokes);
 
         deepForestFourthConnectionBrownDrawingRoot = deepForestFourthConnectionBrownDrawingRoot != null ? deepForestFourthConnectionBrownDrawingRoot : CreateDeepForestFourthConnectionBrownDrawingRoot();
@@ -2152,6 +2210,10 @@ public class SketchbookDrawingAnimation : MonoBehaviour
         if (existing == null && deepForestDrawingRoot != null)
         {
             existing = deepForestDrawingRoot.Find("GeneratedPencil");
+        }
+        if (existing == null && deepForestFourthConnectionDrawingRoot != null)
+        {
+            existing = deepForestFourthConnectionDrawingRoot.Find("GeneratedPencil");
         }
         if (existing == null && deepForestGreenDrawingRoot != null)
         {
@@ -3359,20 +3421,117 @@ public class SketchbookDrawingAnimation : MonoBehaviour
 
     private static void AddMiniMapFence(List<Vector2[]> strokes)
     {
-        AddMapRect(strokes, 0f, 0f, 34.5f, 23.5f);
-        AddMapRect(strokes, 0f, 0f, 32.8f, 21.8f);
+        bool leaveForestGateOpen = GameProgress.HasDrawnForestSketch;
+        AddMiniMapOvalFenceRail(strokes, MiniMapOvalFenceOuterRailInset, leaveForestGateOpen);
+        AddMiniMapOvalFenceRail(strokes, MiniMapOvalFenceOuterRailInset + MiniMapOvalFenceRailGap, leaveForestGateOpen);
+        AddMiniMapOvalFencePosts(strokes, leaveForestGateOpen);
 
-        for (float x = -30f; x <= 30f; x += 7.5f)
+        if (leaveForestGateOpen)
         {
-            AddMapRect(strokes, x, 23.45f, 0.42f, 1.35f);
-            AddMapRect(strokes, x, -23.45f, 0.42f, 1.35f);
+            float right = MiniMapOvalFenceRadiusX - MiniMapOvalFencePostLength * 0.86f;
+            strokes.Add(MapPoints(right, MiniMapForestGateHalfHeight, right - 1.05f, 1.18f, right, -MiniMapForestGateHalfHeight));
+        }
+    }
+
+    private static void AddMiniMapOvalFenceRail(List<Vector2[]> strokes, float inset, bool leaveForestGateOpen)
+    {
+        List<Vector2> currentStroke = new List<Vector2>();
+
+        for (int i = 0; i <= MiniMapOvalFenceRailResolution; i++)
+        {
+            float angle = Mathf.PI * 2f * i / MiniMapOvalFenceRailResolution;
+            Vector2 mapPoint = GetMiniMapOvalFenceMapPoint(angle, inset);
+
+            if (leaveForestGateOpen && IsMiniMapVillageForestGatePoint(angle, inset))
+            {
+                AddCurrentMiniMapStroke(strokes, currentStroke);
+                continue;
+            }
+
+            currentStroke.Add(mapPoint);
         }
 
-        for (float y = -18f; y <= 18f; y += 6f)
+        AddCurrentMiniMapStroke(strokes, currentStroke);
+    }
+
+    private static void AddMiniMapOvalFencePosts(List<Vector2[]> strokes, bool leaveForestGateOpen)
+    {
+        for (int i = 0; i < MiniMapOvalFencePostCount; i++)
         {
-            AddMapRect(strokes, -34.45f, y, 1.35f, 0.42f);
-            AddMapRect(strokes, 34.45f, y, 1.35f, 0.42f);
+            float angle = Mathf.PI * 2f * i / MiniMapOvalFencePostCount;
+
+            if (leaveForestGateOpen && IsMiniMapVillageForestGatePoint(angle, 0f))
+            {
+                continue;
+            }
+
+            AddMiniMapOvalFencePost(strokes, angle);
         }
+    }
+
+    private static void AddMiniMapOvalFencePost(List<Vector2[]> strokes, float angle)
+    {
+        Vector2 normal = GetMiniMapOvalFenceNormal(angle);
+        Vector2 tangent = new Vector2(-normal.y, normal.x);
+        Vector2 edge = GetMiniMapOvalFencePoint(angle, 0f);
+        Vector2 inner = edge - normal * MiniMapOvalFencePostLength;
+        Vector2 capBase = edge + normal * 0.08f;
+        Vector2 outer = edge + normal * 0.28f;
+        Vector2 halfTangent = tangent * MiniMapOvalFencePostHalfWidth;
+
+        strokes.Add(MapVectorPoints(
+            inner - halfTangent,
+            capBase - halfTangent,
+            outer,
+            capBase + halfTangent,
+            inner + halfTangent,
+            inner - halfTangent));
+
+        Vector2 grainStart = inner + tangent * (MiniMapOvalFencePostHalfWidth * 0.36f);
+        Vector2 grainMiddle = edge + tangent * (MiniMapOvalFencePostHalfWidth * 0.18f);
+        Vector2 grainEnd = capBase + tangent * (MiniMapOvalFencePostHalfWidth * 0.1f);
+        strokes.Add(MapVectorPoints(grainStart, grainMiddle, grainEnd));
+
+        Vector2 knot = Vector2.Lerp(inner, capBase, 0.48f);
+        strokes.Add(MapEllipsePoints(knot.x, knot.y, 0.055f, MiniMapOvalFencePostHalfWidth * 0.34f, 8));
+    }
+
+    private static void AddCurrentMiniMapStroke(List<Vector2[]> strokes, List<Vector2> currentStroke)
+    {
+        if (currentStroke.Count >= 2)
+        {
+            strokes.Add(currentStroke.ToArray());
+        }
+
+        currentStroke.Clear();
+    }
+
+    private static Vector2 GetMiniMapOvalFenceMapPoint(float angle, float inset)
+    {
+        Vector2 point = GetMiniMapOvalFencePoint(angle, inset);
+        return MapPoint(point.x, point.y);
+    }
+
+    private static Vector2 GetMiniMapOvalFencePoint(float angle, float inset)
+    {
+        float radiusX = Mathf.Max(0.1f, MiniMapOvalFenceRadiusX - inset);
+        float radiusY = Mathf.Max(0.1f, MiniMapOvalFenceRadiusY - inset);
+        return new Vector2(Mathf.Cos(angle) * radiusX, Mathf.Sin(angle) * radiusY);
+    }
+
+    private static Vector2 GetMiniMapOvalFenceNormal(float angle)
+    {
+        Vector2 normal = new Vector2(
+            Mathf.Cos(angle) / Mathf.Max(0.1f, MiniMapOvalFenceRadiusX),
+            Mathf.Sin(angle) / Mathf.Max(0.1f, MiniMapOvalFenceRadiusY));
+
+        return normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector2.right;
+    }
+
+    private static bool IsMiniMapVillageForestGatePoint(float angle, float inset)
+    {
+        Vector2 point = GetMiniMapOvalFencePoint(angle, inset);
+        return point.x > MiniMapOvalFenceRadiusX * 0.72f && Mathf.Abs(point.y) <= MiniMapForestGateHalfHeight;
     }
 
     private static void AddMiniMapPaths(List<Vector2[]> strokes)
@@ -3568,6 +3727,18 @@ public class SketchbookDrawingAnimation : MonoBehaviour
             centerX + halfWidth, centerY + halfHeight,
             centerX + halfWidth, centerY - halfHeight,
             centerX - halfWidth, centerY - halfHeight));
+    }
+
+    private static Vector2[] MapVectorPoints(params Vector2[] values)
+    {
+        Vector2[] points = new Vector2[values.Length];
+
+        for (int i = 0; i < values.Length; i++)
+        {
+            points[i] = MapPoint(values[i].x, values[i].y);
+        }
+
+        return points;
     }
 
     private static Vector2[] MapPoints(params float[] values)
